@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     debug: bool = False
     port: int = 8000
     log_level: str = "INFO"
+    cors_allow_origins: str = "http://localhost:3000,http://127.0.0.1:3000"
 
     openai_api_key: SecretStr | None = None
     supabase_url: str | None = None

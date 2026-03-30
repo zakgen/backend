@@ -6,6 +6,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
 from app.routers.business import router as business_router
@@ -38,6 +39,19 @@ def create_app() -> FastAPI:
         description="Business-scoped RAG backend for ZakBot and n8n workflows.",
         lifespan=lifespan,
     )
+    cors_allow_origins = [
+        origin.strip()
+        for origin in settings.cors_allow_origins.split(",")
+        if origin.strip()
+    ]
+    if cors_allow_origins:
+        app.add_middleware(
+            CORSMiddleware,
+            allow_origins=cors_allow_origins,
+            allow_credentials=True,
+            allow_methods=["*"],
+            allow_headers=["*"],
+        )
 
     @app.exception_handler(RequestValidationError)
     async def validation_exception_handler(

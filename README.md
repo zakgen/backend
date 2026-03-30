@@ -57,6 +57,7 @@ Copy `.env.example` to `.env` and fill in:
 - `EMBEDDING_MODEL`: Default `text-embedding-3-small`
 - `PORT`: API port, default `8000`
 - `LOG_LEVEL`: Logging verbosity, default `INFO`
+- `CORS_ALLOW_ORIGINS`: Comma-separated browser origins allowed to call the API
 - `SEARCH_MIN_SCORE`: Minimum semantic score returned in `matches`
 - `TWILIO_ACCOUNT_SID`: Master Twilio account SID used to create/manage subaccounts
 - `TWILIO_AUTH_TOKEN`: Master Twilio auth token
