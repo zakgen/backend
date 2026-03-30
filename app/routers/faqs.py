@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.faq import FAQResponse, FAQUpsertRequest
 from app.services.database import get_session
 from app.services.embedding_service import EmbeddingService
-from app.services.repositories import FAQRepository
+from app.services.repository_factory import RepositoryFactory
 from app.services.sync_service import SyncService
 
 
@@ -17,7 +17,7 @@ router = APIRouter(prefix="/faqs", tags=["faqs"])
 async def upsert_faq(
     payload: FAQUpsertRequest, session: AsyncSession = Depends(get_session)
 ) -> FAQResponse:
-    repository = FAQRepository(session)
+    repository = RepositoryFactory(session).faqs()
     faq = await repository.upsert(payload)
 
     sync_service = SyncService(session=session, embedding_service=EmbeddingService())

@@ -5,12 +5,12 @@ from typing import Any
 from app.config import get_settings
 from app.schemas.search import BusinessContext, SearchMatch, SearchRequest, SearchResponse
 from app.services.embedding_service import EmbeddingService
+from app.services.repository_factory import RepositoryFactory
 from app.services.search_formatting import (
     format_business_match,
     format_faq_match,
     format_product_match,
 )
-from app.services.repositories import BusinessRepository, FAQRepository, ProductRepository
 
 
 class SearchService:
@@ -18,9 +18,10 @@ class SearchService:
         self.session = session
         self.embedding_service = embedding_service
         self.settings = get_settings()
-        self.business_repository = BusinessRepository(session)
-        self.product_repository = ProductRepository(session)
-        self.faq_repository = FAQRepository(session)
+        factory = RepositoryFactory(session, self.settings)
+        self.business_repository = factory.business()
+        self.product_repository = factory.products()
+        self.faq_repository = factory.faqs()
 
     async def search(self, payload: SearchRequest) -> SearchResponse:
         business = await self.business_repository.get_by_id(payload.business_id)

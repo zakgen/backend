@@ -5,12 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.services.embedding_service import EmbeddingService
-from app.services.repositories import (
-    BusinessRepository,
-    FAQRepository,
-    ProductRepository,
-    SyncStatusRepository,
-)
+from app.services.repository_factory import RepositoryFactory
 from app.services.text_builder import (
     build_business_profile_text,
     build_faq_embedding_text,
@@ -23,10 +18,11 @@ class SyncService:
         self.session = session
         self.embedding_service = embedding_service
         self.settings = get_settings()
-        self.business_repository = BusinessRepository(session)
-        self.product_repository = ProductRepository(session)
-        self.faq_repository = FAQRepository(session)
-        self.sync_status_repository = SyncStatusRepository(session)
+        factory = RepositoryFactory(session, self.settings)
+        self.business_repository = factory.business()
+        self.product_repository = factory.products()
+        self.faq_repository = factory.faqs()
+        self.sync_status_repository = factory.sync_status()
 
     async def sync_business_embeddings(self, business_id: int) -> dict[str, int | str]:
         business_synced = await self.sync_business_profile(business_id)

@@ -24,7 +24,10 @@ class Settings(BaseSettings):
     openai_api_key: SecretStr | None = None
     supabase_url: str | None = None
     supabase_service_role_key: SecretStr | None = None
-    db_url: str = Field(..., description="Supabase Postgres connection string")
+    database_backend: str = "postgres"
+    db_url: str | None = Field(default=None, description="Postgres connection string")
+    mongo_url: str | None = None
+    mongo_database_name: str = "zakbot"
 
     embedding_model: str = "text-embedding-3-small"
     embedding_dimensions: int = 1536

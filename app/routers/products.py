@@ -19,7 +19,7 @@ from app.schemas.product import (
 from app.services.database import get_session
 from app.services.dashboard_service import build_product_storage_payload, product_row_to_dashboard
 from app.services.embedding_service import EmbeddingService
-from app.services.repositories import ProductRepository
+from app.services.repository_factory import RepositoryFactory
 from app.services.sync_service import SyncService
 
 
@@ -37,7 +37,7 @@ async def list_products(
     category: str | None = None,
     session: AsyncSession = Depends(get_session),
 ) -> ProductListResult:
-    rows, total, categories = await ProductRepository(session).list_dashboard(
+    rows, total, categories = await RepositoryFactory(session).products().list_dashboard(
         business_id, search=search, category=category
     )
     return ProductListResult(
@@ -51,7 +51,7 @@ async def list_products(
 async def create_product(
     payload: DashboardProductCreateRequest, session: AsyncSession = Depends(get_session)
 ) -> Product:
-    repository = ProductRepository(session)
+    repository = RepositoryFactory(session).products()
     product_row = await repository.create_dashboard_product(
         build_product_storage_payload(
             business_id=payload.business_id,
@@ -82,7 +82,7 @@ async def update_product(
     payload: DashboardProductUpdateRequest,
     session: AsyncSession = Depends(get_session),
 ) -> Product:
-    repository = ProductRepository(session)
+    repository = RepositoryFactory(session).products()
     existing = await repository.get_by_product_id(product_id)
     updated_row = await repository.update_dashboard_product(
         product_id,
@@ -124,7 +124,7 @@ async def update_product(
 async def delete_product(
     product_id: int, session: AsyncSession = Depends(get_session)
 ) -> dict[str, bool | str]:
-    deleted = await ProductRepository(session).delete(product_id)
+    deleted = await RepositoryFactory(session).products().delete(product_id)
     await SyncService(session=session, embedding_service=EmbeddingService()).update_status_snapshot(
         deleted["business_id"],
         last_result="Product deleted from dashboard.",
@@ -137,7 +137,7 @@ async def delete_product(
 async def bulk_create_products(
     payload: DashboardProductBulkRequest, session: AsyncSession = Depends(get_session)
 ) -> ProductListResult:
-    repository = ProductRepository(session)
+    repository = RepositoryFactory(session).products()
     created_rows = []
     for item in payload.products:
         created_rows.append(
@@ -177,7 +177,7 @@ async def bulk_create_products(
 async def upsert_product(
     payload: ProductUpsertRequest, session: AsyncSession = Depends(get_session)
 ) -> ProductResponse:
-    repository = ProductRepository(session)
+    repository = RepositoryFactory(session).products()
     product = await repository.upsert(payload)
 
     sync_service = SyncService(session=session, embedding_service=EmbeddingService())
@@ -199,7 +199,7 @@ async def upsert_product(
 async def bulk_upsert_products(
     payload: BulkProductUpsertRequest, session: AsyncSession = Depends(get_session)
 ) -> BulkProductUpsertResponse:
-    repository = ProductRepository(session)
+    repository = RepositoryFactory(session).products()
     products = await repository.bulk_upsert(payload)
 
     sync_service = SyncService(session=session, embedding_service=EmbeddingService())

@@ -4,7 +4,7 @@ import argparse
 import asyncio
 
 from app.services.database import get_session_factory
-from app.services.repositories import BusinessRepository, IntegrationRepository
+from app.services.repository_factory import RepositoryFactory
 from app.utils.phones import normalize_phone_number
 
 
@@ -18,8 +18,9 @@ async def main() -> None:
 
     session_factory = get_session_factory()
     async with session_factory() as session:
-        business = await BusinessRepository(session).get_by_id(args.business_id)
-        repository = IntegrationRepository(session)
+        factory = RepositoryFactory(session)
+        business = await factory.business().get_by_id(args.business_id)
+        repository = factory.integrations()
         existing = await repository.get_connection(args.business_id, "whatsapp")
         if existing is None:
             raise SystemExit(f"Business {args.business_id} has no pending WhatsApp integration.")

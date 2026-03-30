@@ -7,7 +7,7 @@ from app.schemas.faq import FAQUpsertRequest
 from app.schemas.product import BulkProductUpsertRequest, ProductBulkItem
 from app.services.database import get_session_factory
 from app.services.embedding_service import EmbeddingService
-from app.services.repositories import BusinessRepository, FAQRepository, ProductRepository
+from app.services.repository_factory import RepositoryFactory
 from app.services.sync_service import SyncService
 
 
@@ -15,9 +15,10 @@ async def main() -> None:
     session_factory = get_session_factory()
 
     async with session_factory() as session:
-        business_repository = BusinessRepository(session)
-        product_repository = ProductRepository(session)
-        faq_repository = FAQRepository(session)
+        factory = RepositoryFactory(session)
+        business_repository = factory.business()
+        product_repository = factory.products()
+        faq_repository = factory.faqs()
 
         business = await business_repository.upsert(
             BusinessUpsertRequest(

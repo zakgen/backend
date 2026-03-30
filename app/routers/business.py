@@ -36,14 +36,7 @@ from app.services.dashboard_service import (
 )
 from app.services.embedding_service import EmbeddingService
 from app.services.messaging_service import MessagingService
-from app.services.repositories import (
-    BusinessRepository,
-    ChatRepository,
-    FAQRepository,
-    IntegrationRepository,
-    ProductRepository,
-    SyncStatusRepository,
-)
+from app.services.repository_factory import RepositoryFactory
 from app.services.sync_service import SyncService
 from app.services.twilio_provider import TwilioMessagingProvider
 
@@ -55,7 +48,7 @@ router = APIRouter(prefix="/business", tags=["business"])
 async def upsert_business(
     payload: BusinessUpsertRequest, session: AsyncSession = Depends(get_session)
 ) -> BusinessResponse:
-    repository = BusinessRepository(session)
+    repository = RepositoryFactory(session).business()
     record = await repository.upsert(payload)
 
     sync_service = SyncService(session=session, embedding_service=EmbeddingService())
@@ -73,8 +66,9 @@ async def upsert_business(
 async def get_business_profile(
     business_id: int, session: AsyncSession = Depends(get_session)
 ) -> BusinessProfile:
-    business_repository = BusinessRepository(session)
-    faq_repository = FAQRepository(session)
+    factory = RepositoryFactory(session)
+    business_repository = factory.business()
+    faq_repository = factory.faqs()
     business_row = await business_repository.get_by_id(business_id)
     faq_rows = await faq_repository.list_by_business(business_id)
     return business_row_to_profile(business_row, faq_rows)
@@ -86,8 +80,9 @@ async def update_business_profile(
     payload: BusinessProfileUpdateRequest,
     session: AsyncSession = Depends(get_session),
 ) -> BusinessProfile:
-    business_repository = BusinessRepository(session)
-    faq_repository = FAQRepository(session)
+    factory = RepositoryFactory(session)
+    business_repository = factory.business()
+    faq_repository = factory.faqs()
     existing_row = await business_repository.get_by_id(business_id)
 
     merged_payload = merge_business_update(existing_row, payload)
@@ -128,8 +123,9 @@ async def list_business_chats(
     needs_human: bool | None = Query(default=None),
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationSummary]:
-    await BusinessRepository(session).get_by_id(business_id)
-    rows = await ChatRepository(session).list_messages(
+    factory = RepositoryFactory(session)
+    await factory.business().get_by_id(business_id)
+    rows = await factory.chats().list_messages(
         business_id,
         phone=phone,
         intent=intent,
@@ -147,8 +143,9 @@ async def list_business_chats(
 async def get_business_chat_thread(
     business_id: int, phone: str, session: AsyncSession = Depends(get_session)
 ) -> ConversationThread:
-    await BusinessRepository(session).get_by_id(business_id)
-    rows = await ChatRepository(session).get_thread(business_id, phone)
+    factory = RepositoryFactory(session)
+    await factory.business().get_by_id(business_id)
+    rows = await factory.chats().get_thread(business_id, phone)
     if not rows:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -165,12 +162,13 @@ async def get_business_chat_thread(
 async def get_business_overview(
     business_id: int, session: AsyncSession = Depends(get_session)
 ) -> OverviewData:
-    business_repository = BusinessRepository(session)
-    faq_repository = FAQRepository(session)
-    product_repository = ProductRepository(session)
-    chat_repository = ChatRepository(session)
-    integration_repository = IntegrationRepository(session)
-    sync_repository = SyncStatusRepository(session)
+    factory = RepositoryFactory(session)
+    business_repository = factory.business()
+    faq_repository = factory.faqs()
+    product_repository = factory.products()
+    chat_repository = factory.chats()
+    integration_repository = factory.integrations()
+    sync_repository = factory.sync_status()
 
     business_row = await business_repository.get_by_id(business_id)
     faq_rows = await faq_repository.list_by_business(business_id)
@@ -218,10 +216,11 @@ async def get_business_overview(
 async def get_business_integrations(
     business_id: int, session: AsyncSession = Depends(get_session)
 ) -> IntegrationsData:
-    business_repository = BusinessRepository(session)
-    product_repository = ProductRepository(session)
-    faq_repository = FAQRepository(session)
-    integration_repository = IntegrationRepository(session)
+    factory = RepositoryFactory(session)
+    business_repository = factory.business()
+    product_repository = factory.products()
+    faq_repository = factory.faqs()
+    integration_repository = factory.integrations()
 
     business_row = await business_repository.get_by_id(business_id)
     faq_rows = await faq_repository.list_by_business(business_id)
@@ -288,9 +287,10 @@ async def sync_platform_integration(
             detail=f"Unsupported platform {platform}.",
         )
 
-    await BusinessRepository(session).get_by_id(business_id)
-    integration_repository = IntegrationRepository(session)
-    product_count = await ProductRepository(session).count_by_business(business_id)
+    factory = RepositoryFactory(session)
+    await factory.business().get_by_id(business_id)
+    integration_repository = factory.integrations()
+    product_count = await factory.products().count_by_business(business_id)
     existing = await integration_repository.get_connection(business_id, platform)
     connection = await integration_repository.upsert_connection(
         business_id=business_id,

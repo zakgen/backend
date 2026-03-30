@@ -7,7 +7,7 @@ from app.schemas.search import EmbeddingSyncResponse, SyncStatusResponse
 from app.services.database import get_session
 from app.services.dashboard_service import derive_sync_status
 from app.services.embedding_service import EmbeddingService
-from app.services.repositories import ProductRepository, SyncStatusRepository
+from app.services.repository_factory import RepositoryFactory
 from app.services.sync_service import SyncService
 
 
@@ -22,12 +22,13 @@ router = APIRouter(prefix="/embeddings", tags=["embeddings"])
 async def get_business_embedding_status(
     business_id: int, session: AsyncSession = Depends(get_session)
 ) -> SyncStatusResponse:
-    sync_repository = SyncStatusRepository(session)
+    factory = RepositoryFactory(session)
+    sync_repository = factory.sync_status()
     return derive_sync_status(
         business_id=business_id,
         snapshot_row=await sync_repository.get_status(business_id),
         counts=await sync_repository.get_embedding_counts(business_id),
-        has_products=await ProductRepository(session).count_by_business(business_id) > 0,
+        has_products=await factory.products().count_by_business(business_id) > 0,
     )
 
 

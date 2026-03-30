@@ -26,14 +26,7 @@ from app.services.embedding_service import EmbeddingService
 from app.services.llm_provider import AbstractLLMProvider
 from app.services.openai_llm_provider import OpenAILLMProvider
 from app.services.reply_validation_service import ReplyValidationService
-from app.services.repositories import (
-    AIRunRepository,
-    BusinessRepository,
-    ChatRepository,
-    FAQRepository,
-    IntegrationRepository,
-    ProductRepository,
-)
+from app.services.repository_factory import RepositoryFactory
 from app.services.search_formatting import (
     format_business_match,
     format_faq_match,
@@ -88,12 +81,13 @@ class AIReplyService:
         self.embedding_service = embedding_service or EmbeddingService(self.settings)
         self.messaging_provider = messaging_provider
         self.validation_service = ReplyValidationService(self.settings)
-        self.business_repository = BusinessRepository(session)
-        self.product_repository = ProductRepository(session)
-        self.faq_repository = FAQRepository(session)
-        self.chat_repository = ChatRepository(session)
-        self.integration_repository = IntegrationRepository(session)
-        self.ai_run_repository = AIRunRepository(session)
+        factory = RepositoryFactory(session, self.settings)
+        self.business_repository = factory.business()
+        self.product_repository = factory.products()
+        self.faq_repository = factory.faqs()
+        self.chat_repository = factory.chats()
+        self.integration_repository = factory.integrations()
+        self.ai_run_repository = factory.ai_runs()
 
     async def generate_preview(
         self, business_id: int, payload: AIReplyRequest

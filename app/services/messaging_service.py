@@ -14,7 +14,7 @@ from app.services.ai_reply_service import AIReplyService
 from app.services.dashboard_service import build_whatsapp_integration, chat_row_to_message, to_iso
 from app.services.messaging_provider import AbstractMessagingProvider
 from app.services.messaging_types import ConnectionState, SendMessageCommand
-from app.services.repositories import BusinessRepository, ChatRepository, IntegrationRepository
+from app.services.repository_factory import RepositoryFactory
 
 
 logger = logging.getLogger(__name__)
@@ -44,9 +44,10 @@ class MessagingService:
     ) -> None:
         self.session = session
         self.provider = provider
-        self.business_repository = BusinessRepository(session)
-        self.chat_repository = ChatRepository(session)
-        self.integration_repository = IntegrationRepository(session)
+        factory = RepositoryFactory(session)
+        self.business_repository = factory.business()
+        self.chat_repository = factory.chats()
+        self.integration_repository = factory.integrations()
 
     async def begin_whatsapp_connection(
         self, business_id: int, payload: WhatsAppConnectRequest

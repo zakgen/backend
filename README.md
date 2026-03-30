@@ -48,7 +48,10 @@ Copy `.env.example` to `.env` and fill in:
 - `OPENAI_API_KEY`: OpenAI API key used for embeddings
 - `SUPABASE_URL`: Supabase project URL, documented for future admin integrations
 - `SUPABASE_SERVICE_ROLE_KEY`: Supabase service role key, documented for future admin integrations
+- `DATABASE_BACKEND`: Persistence backend selector. `postgres` remains the production default; `mongo` scaffolding is available for migration work
 - `DB_URL`: Async SQLAlchemy connection string used when the API runs on your host machine
+- `MONGO_URL`: MongoDB Atlas connection string for the planned Mongo migration path
+- `MONGO_DATABASE_NAME`: Mongo database name when `DATABASE_BACKEND=mongo`
 - `DOCKER_DB_URL`: Async SQLAlchemy connection string used by the API container in Docker Compose
 - `LOCAL_DB_NAME`: Local Docker Postgres database name
 - `LOCAL_DB_USER`: Local Docker Postgres username
@@ -72,6 +75,18 @@ Copy `.env.example` to `.env` and fill in:
 - `TWILIO_ACCOUNT_SID`: Master Twilio account SID used to create/manage subaccounts
 - `TWILIO_AUTH_TOKEN`: Master Twilio auth token
 - `PUBLIC_WEBHOOK_BASE_URL`: Public base URL used to build Twilio status callback URLs
+
+## MongoDB migration scaffolding
+
+The codebase now includes a repository factory and Mongo configuration scaffolding so the storage layer can be migrated incrementally without changing API contracts.
+
+Current status:
+
+- `DATABASE_BACKEND=postgres` is the supported production mode
+- `DATABASE_BACKEND=mongo` is not fully implemented yet
+- the service and router layers now resolve repositories through a central factory instead of instantiating Postgres repositories directly
+
+This is phase 1 of the migration path only. CRUD and vector search parity for MongoDB still need to be implemented behind the repository factory.
 
 Default local `DB_URL` for host-machine development:
 
