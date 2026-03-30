@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from datetime import UTC, datetime
+import logging
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -9,10 +10,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.conversation import ConversationReplyRequest
 from app.schemas.integration import WhatsAppConnectRequest
+from app.services.ai_reply_service import AIReplyService
 from app.services.dashboard_service import build_whatsapp_integration, chat_row_to_message, to_iso
 from app.services.messaging_provider import AbstractMessagingProvider
 from app.services.messaging_types import ConnectionState, SendMessageCommand
 from app.services.repositories import BusinessRepository, ChatRepository, IntegrationRepository
+
+
+logger = logging.getLogger(__name__)
 
 
 def _connection_state_from_row(
@@ -216,6 +221,27 @@ class MessagingService:
             received_delta=1,
             touch_last_activity=True,
         )
+        try:
+            ai_service = AIReplyService(
+                session=self.session,
+                messaging_provider=self.provider,
+            )
+            await ai_service.process_inbound_message(
+                connection=connection,
+                inbound_row=row,
+            )
+        except Exception as exc:
+            logger.exception(
+                "AI auto-reply processing failed for business %s inbound message %s",
+                connection["business_id"],
+                row["id"],
+                exc_info=exc,
+            )
+            await self.chat_repository.update_message_analysis(
+                int(row["id"]),
+                intent=None,
+                needs_human=True,
+            )
         return row
 
     async def handle_status_webhook(

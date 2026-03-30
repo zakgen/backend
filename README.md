@@ -59,6 +59,16 @@ Copy `.env.example` to `.env` and fill in:
 - `LOG_LEVEL`: Logging verbosity, default `INFO`
 - `CORS_ALLOW_ORIGINS`: Comma-separated browser origins allowed to call the API
 - `SEARCH_MIN_SCORE`: Minimum semantic score returned in `matches`
+- `LLM_PROVIDER`: LLM backend for grounded replies, currently `openai`
+- `OPENAI_CHAT_MODEL`: Chat model used for grounded reply generation
+- `AI_REPLY_MAX_CONTEXT_ITEMS`: Maximum retrieved evidence items passed to the reply model
+- `AI_REPLY_MAX_HISTORY_MESSAGES`: Maximum recent thread messages included in the reply prompt
+- `AI_REPLY_CONFIDENCE_THRESHOLD`: Minimum confidence required before auto-send
+- `AI_AUTO_REPLY_ENABLED_DEFAULT`: Default auto-reply behavior when not overridden in WhatsApp integration config
+- `AI_REPLY_AUDIT_LOG_ENABLED`: Enable or disable the dedicated AI reply audit log
+- `AI_REPLY_AUDIT_LOG_PATH`: File path for structured AI reply audit entries
+- `AI_REPLY_AUDIT_MAX_BYTES`: Rotation size for the AI audit log
+- `AI_REPLY_AUDIT_BACKUP_COUNT`: Number of rotated AI audit log files to keep
 - `TWILIO_ACCOUNT_SID`: Master Twilio account SID used to create/manage subaccounts
 - `TWILIO_AUTH_TOKEN`: Master Twilio auth token
 - `PUBLIC_WEBHOOK_BASE_URL`: Public base URL used to build Twilio status callback URLs
@@ -180,7 +190,8 @@ If you want to use Supabase instead of the local database:
 3. Run `migrations/001_init.sql`.
 4. Run `migrations/002_dashboard_support.sql`.
 5. Run `migrations/003_twilio_messaging.sql`.
-6. Confirm `pgvector` is enabled and the tables were created.
+6. Run `migrations/004_ai_reply_runs.sql`.
+7. Confirm `pgvector` is enabled and the tables were created.
 
 ## Run the API
 
@@ -231,6 +242,9 @@ This inserts:
 - `GET /embeddings/sync/business/{business_id}/status`
 - `POST /embeddings/sync/business/{business_id}`
 - `POST /business/{id}/chats/{phone}/reply`
+- `POST /business/{id}/ai/reply`
+- `GET /business/{id}/ai/runs`
+- `GET /business/{id}/ai/runs/{run_id}`
 - `POST /webhooks/twilio/whatsapp/inbound`
 - `POST /webhooks/twilio/whatsapp/status`
 - `POST /search`
@@ -451,6 +465,48 @@ Response shape:
 3. Call `POST /search`.
 4. Pass `matches` and `business_context` into the LLM prompt.
 5. Use `confidence_label` or low result count to decide when to ask clarifying questions.
+
+## Grounded AI reply flow
+
+ZakBot also includes a backend-owned grounded reply pipeline for WhatsApp.
+
+Main behavior:
+
+1. Twilio posts inbound WhatsApp messages to `POST /webhooks/twilio/whatsapp/inbound`.
+2. The backend stores the inbound chat row.
+3. If the WhatsApp integration is connected and AI auto-reply is enabled, ZakBot:
+   - loads recent thread history
+   - retrieves business-scoped products, FAQs, and business knowledge
+   - builds a grounded prompt
+   - asks the chat model for structured JSON only
+   - validates grounding, confidence, and cited sources
+4. If validation passes, ZakBot sends the reply through Twilio and stores the outbound message.
+5. If validation fails, the inbound message is marked `needs_human=true` and no synthetic fallback is sent.
+
+Manual/debug endpoints:
+
+- `POST /business/{id}/ai/reply`
+- `GET /business/{id}/ai/runs`
+- `GET /business/{id}/ai/runs/{run_id}`
+
+The AI run trace stores compact audit data only:
+
+- selected evidence ids, types, and scores
+- structured model output
+- prompt version
+- send or escalation decision
+
+It does not persist chain-of-thought output.
+
+When `AI_REPLY_AUDIT_LOG_ENABLED=true`, ZakBot also writes one JSON line per AI run to `AI_REPLY_AUDIT_LOG_PATH`. Each entry includes:
+
+- the customer message
+- the selected retrieval evidence
+- the exact prompt payload sent to the model
+- the structured model output
+- the final decision and send outcome
+
+This is useful for debugging inbound WhatsApp replies without querying the database first.
 
 ## Notes
 

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.routers.ai import router as ai_router
 from app.routers.business import router as business_router
 from app.routers.embeddings import router as embeddings_router
 from app.routers.faqs import router as faqs_router
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     settings = get_settings()
-    setup_logging(settings.log_level)
+    setup_logging(settings)
     logger.info("Starting %s in %s mode", settings.app_name, settings.environment)
     _.state.public_webhook_base_url = settings.public_webhook_base_url
     yield
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
 
     app.include_router(health_router)
     app.include_router(business_router)
+    app.include_router(ai_router)
     app.include_router(messaging_router)
     app.include_router(products_router)
     app.include_router(faqs_router)

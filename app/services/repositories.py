@@ -818,6 +818,27 @@ class ChatRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session
 
+    async def get_message(self, message_id: int) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, phone, customer_name, text, direction, intent,
+                       needs_human, is_read, provider, provider_message_sid,
+                       provider_status, error_code, raw_payload, created_at, updated_at
+                FROM chat_messages
+                WHERE id = :message_id
+                """
+            ),
+            {"message_id": message_id},
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat message {message_id} was not found.",
+            )
+        return dict(row)
+
     async def list_messages(
         self,
         business_id: int,
@@ -988,6 +1009,198 @@ class ChatRepository:
         )
         row = result.mappings().first()
         return dict(row) if row is not None else None
+
+    async def update_message_analysis(
+        self,
+        message_id: int,
+        *,
+        intent: str | None,
+        needs_human: bool,
+    ) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                UPDATE chat_messages
+                SET intent = :intent,
+                    needs_human = :needs_human,
+                    updated_at = timezone('utc', now())
+                WHERE id = :message_id
+                RETURNING id, business_id, phone, customer_name, text, direction, intent,
+                          needs_human, is_read, provider, provider_message_sid,
+                          provider_status, error_code, raw_payload, created_at, updated_at
+                """
+            ),
+            {
+                "message_id": message_id,
+                "intent": intent,
+                "needs_human": needs_human,
+            },
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Chat message {message_id} was not found.",
+            )
+        return dict(row)
+
+
+class AIRunRepository:
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def create_run(
+        self,
+        *,
+        business_id: int,
+        phone: str | None,
+        inbound_chat_message_id: int | None,
+        outbound_chat_message_id: int | None,
+        provider: str,
+        model: str,
+        status_value: str,
+        customer_message: str,
+        language: str | None,
+        intent: str | None,
+        needs_human: bool,
+        confidence: float,
+        reply_text: str | None,
+        fallback_reason: str | None,
+        retrieval_summary: dict[str, Any],
+        prompt_version: str,
+        request_payload: dict[str, Any],
+        response_payload: dict[str, Any],
+    ) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                INSERT INTO ai_message_runs (
+                    business_id, phone, inbound_chat_message_id, outbound_chat_message_id,
+                    provider, model, status, customer_message, language, intent,
+                    needs_human, confidence, reply_text, fallback_reason,
+                    retrieval_summary, prompt_version, request_payload, response_payload
+                )
+                VALUES (
+                    :business_id, :phone, :inbound_chat_message_id, :outbound_chat_message_id,
+                    :provider, :model, :status, :customer_message, :language, :intent,
+                    :needs_human, :confidence, :reply_text, :fallback_reason,
+                    CAST(:retrieval_summary AS jsonb), :prompt_version,
+                    CAST(:request_payload AS jsonb), CAST(:response_payload AS jsonb)
+                )
+                RETURNING id, business_id, phone, inbound_chat_message_id, outbound_chat_message_id,
+                          provider, model, status, customer_message, language, intent,
+                          needs_human, confidence, reply_text, fallback_reason,
+                          retrieval_summary, prompt_version, request_payload, response_payload,
+                          created_at, updated_at
+                """
+            ),
+            {
+                "business_id": business_id,
+                "phone": normalize_phone_number(phone) if phone else None,
+                "inbound_chat_message_id": inbound_chat_message_id,
+                "outbound_chat_message_id": outbound_chat_message_id,
+                "provider": provider,
+                "model": model,
+                "status": status_value,
+                "customer_message": customer_message,
+                "language": language,
+                "intent": intent,
+                "needs_human": needs_human,
+                "confidence": confidence,
+                "reply_text": reply_text,
+                "fallback_reason": fallback_reason,
+                "retrieval_summary": _json_dumps(retrieval_summary),
+                "prompt_version": prompt_version,
+                "request_payload": _json_dumps(request_payload),
+                "response_payload": _json_dumps(response_payload),
+            },
+        )
+        return dict(result.mappings().one())
+
+    async def update_run(
+        self,
+        run_id: int,
+        *,
+        status_value: str,
+        outbound_chat_message_id: int | None = None,
+        fallback_reason: str | None = None,
+        response_payload: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                UPDATE ai_message_runs
+                SET status = :status,
+                    outbound_chat_message_id = COALESCE(CAST(:outbound_chat_message_id AS bigint), outbound_chat_message_id),
+                    fallback_reason = COALESCE(CAST(:fallback_reason AS text), fallback_reason),
+                    response_payload = COALESCE(CAST(:response_payload AS jsonb), response_payload),
+                    updated_at = timezone('utc', now())
+                WHERE id = :run_id
+                RETURNING id, business_id, phone, inbound_chat_message_id, outbound_chat_message_id,
+                          provider, model, status, customer_message, language, intent,
+                          needs_human, confidence, reply_text, fallback_reason,
+                          retrieval_summary, prompt_version, request_payload, response_payload,
+                          created_at, updated_at
+                """
+            ),
+            {
+                "run_id": run_id,
+                "status": status_value,
+                "outbound_chat_message_id": outbound_chat_message_id,
+                "fallback_reason": fallback_reason,
+                "response_payload": _json_dumps(response_payload) if response_payload is not None else None,
+            },
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"AI run {run_id} was not found.",
+            )
+        return dict(row)
+
+    async def list_runs(self, business_id: int, limit: int = 50) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, phone, inbound_chat_message_id, outbound_chat_message_id,
+                       provider, model, status, customer_message, language, intent,
+                       needs_human, confidence, reply_text, fallback_reason,
+                       retrieval_summary, prompt_version, request_payload, response_payload,
+                       created_at, updated_at
+                FROM ai_message_runs
+                WHERE business_id = :business_id
+                ORDER BY created_at DESC, id DESC
+                LIMIT :limit
+                """
+            ),
+            {"business_id": business_id, "limit": limit},
+        )
+        return [dict(row) for row in result.mappings().all()]
+
+    async def get_run(self, business_id: int, run_id: int) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, phone, inbound_chat_message_id, outbound_chat_message_id,
+                       provider, model, status, customer_message, language, intent,
+                       needs_human, confidence, reply_text, fallback_reason,
+                       retrieval_summary, prompt_version, request_payload, response_payload,
+                       created_at, updated_at
+                FROM ai_message_runs
+                WHERE business_id = :business_id
+                  AND id = :run_id
+                """
+            ),
+            {"business_id": business_id, "run_id": run_id},
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"AI run {run_id} was not found for business {business_id}.",
+            )
+        return dict(row)
 
 
 class IntegrationRepository:
