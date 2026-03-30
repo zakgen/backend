@@ -53,7 +53,7 @@ def _build_engine_url_and_options(db_url: str) -> tuple[str, dict]:
 def get_engine() -> AsyncEngine:
     settings = get_settings()
     engine_url, engine_options = _build_engine_url_and_options(settings.db_url)
-    return create_async_engine(engine_url, **engine_options)
+    return create_async_engine(settings.db_url, connect_args={"ssl": True})
 
 
 @lru_cache
