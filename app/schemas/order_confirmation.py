@@ -23,6 +23,16 @@ OrderConfirmationAction = Literal[
     "resend",
     "reopen",
 ]
+OrderSessionPrimaryAction = Literal[
+    "confirm",
+    "decline",
+    "edit_request",
+    "delivery_question",
+    "payment_question",
+    "return_policy_question",
+    "support_request",
+    "unknown",
+]
 
 
 class StoreOrderItem(BaseModel):
@@ -125,3 +135,26 @@ class OrderConfirmationActionRequest(BaseModel):
     action: OrderConfirmationAction
     note: str | None = Field(default=None, max_length=1000)
 
+
+class OrderSessionStructuredEdit(BaseModel):
+    field: Literal[
+        "delivery_address",
+        "delivery_city",
+        "customer_phone",
+        "quantity",
+        "variant",
+        "product_name",
+    ]
+    value: str
+
+
+class OrderSessionInterpretation(BaseModel):
+    language: Literal["english", "french", "darija"]
+    primary_action: OrderSessionPrimaryAction
+    secondary_actions: list[OrderSessionPrimaryAction] = Field(default_factory=list)
+    confidence: float = Field(default=0.0, ge=0, le=1)
+    needs_human: bool = False
+    question_type: str | None = None
+    edits: list[OrderSessionStructuredEdit] = Field(default_factory=list)
+    cancellation_reason: str | None = None
+    reply_summary: str | None = None

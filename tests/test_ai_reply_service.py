@@ -7,6 +7,7 @@ import pytest
 from app.config import Settings
 from app.schemas.ai import AIReplyRequest
 from app.schemas.business import BusinessProfile
+from app.schemas.order_confirmation import OrderSessionInterpretation
 from app.services.ai_reply_service import AIReplyService
 
 
@@ -22,6 +23,24 @@ class DummyLLMProvider:
         if "cancel my order" in lowered:
             return "english", {"language_detection": {"language": "english"}}
         return "english", {"language_detection": {"language": "english"}}
+
+    async def interpret_order_session(
+        self,
+        *,
+        customer_message: str,
+        preferred_language: str | None,
+        session_status: str,
+        order_snapshot: dict,
+    ):
+        return (
+            OrderSessionInterpretation(
+                language="english",
+                primary_action="unknown",
+                confidence=0.0,
+                needs_human=True,
+            ),
+            {"order_session_interpretation": {"primary_action": "unknown"}},
+        )
 
 
 class DummyAIRunRepository:

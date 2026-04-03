@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.schemas.order_confirmation import (
     OrderConfirmationAction,
     OrderConfirmationActionRequest,
+    OrderSessionInterpretation,
     StoreOrderIngestRequest,
 )
 from app.services.ai_helpers import normalize_language_label
@@ -169,15 +170,28 @@ class OrderConfirmationService:
             language_hint or session_row.get("preferred_language"),
             fallback=normalize_language_label(session_row.get("preferred_language"), "french"),
         )
-        action = self._detect_customer_action(message_text)
         order_row = await self.order_repository.get_by_id(
             business_id, int(session_row["order_id"])
         )
         snapshot = dict(session_row.get("structured_snapshot") or {})
+        action = self._detect_customer_action(message_text)
+        interpretation: OrderSessionInterpretation | None = None
+        if action is None:
+            interpretation = await self._interpret_session_message(
+                customer_message=message_text,
+                session_row=session_row,
+                order_row=order_row,
+                snapshot=snapshot,
+            )
+            language = normalize_language_label(
+                interpretation.language,
+                fallback=language,
+            )
         session_update: dict[str, Any] = {
             "preferred_language": language,
             "last_customer_message_at": datetime.now(UTC),
-            "last_detected_intent": action or "free_text",
+            "last_detected_intent": action
+            or (interpretation.primary_action if interpretation is not None else "free_text"),
         }
         order_status = order_row.get("status") or "pending_confirmation"
         confirmation_status = order_row.get("confirmation_status") or session_row["status"]
@@ -212,6 +226,25 @@ class OrderConfirmationService:
             event_type = "customer_requested_human"
             outbound_text = self._build_human_reply(language)
             needs_human = True
+        elif interpretation is not None:
+            (
+                session_update,
+                order_status,
+                confirmation_status,
+                event_type,
+                outbound_text,
+                needs_human,
+                snapshot,
+            ) = self._apply_ai_interpretation(
+                interpretation=interpretation,
+                session_row=session_row,
+                order_row=order_row,
+                snapshot=snapshot,
+                language=language,
+                default_session_update=session_update,
+                default_order_status=order_status,
+                default_confirmation_status=confirmation_status,
+            )
         elif session_row["status"] == "edit_requested":
             pending_edits = list(snapshot.get("pending_edits") or [])
             pending_edits.append(
@@ -257,7 +290,11 @@ class OrderConfirmationService:
             session_id=int(session_row["id"]),
             order_id=int(order_row["id"]),
             event_type=event_type,
-            payload={"message": message_text, "action": action},
+            payload={
+                "message": message_text,
+                "action": action,
+                "ai_interpretation": interpretation.model_dump() if interpretation is not None else None,
+            },
         )
         await self.chat_repository.update_message_analysis(
             int(inbound_row["id"]),
@@ -271,6 +308,195 @@ class OrderConfirmationService:
             connection=connection,
         )
         return True
+
+    async def _interpret_session_message(
+        self,
+        *,
+        customer_message: str,
+        session_row: dict[str, Any],
+        order_row: dict[str, Any],
+        snapshot: dict[str, Any],
+    ) -> OrderSessionInterpretation:
+        try:
+            interpretation, _ = await self.llm_provider.interpret_order_session(
+                customer_message=customer_message,
+                preferred_language=str(session_row.get("preferred_language") or ""),
+                session_status=str(session_row.get("status") or "awaiting_customer"),
+                order_snapshot={
+                    **snapshot,
+                    "order_status": order_row.get("status"),
+                    "confirmation_status": order_row.get("confirmation_status"),
+                },
+            )
+            return interpretation
+        except Exception:
+            return OrderSessionInterpretation(
+                language=normalize_language_label(
+                    session_row.get("preferred_language"), "french"
+                ),
+                primary_action="unknown",
+                confidence=0.0,
+                needs_human=True,
+                reply_summary="Fallback interpretation due to LLM failure.",
+            )
+
+    def _apply_ai_interpretation(
+        self,
+        *,
+        interpretation: OrderSessionInterpretation,
+        session_row: dict[str, Any],
+        order_row: dict[str, Any],
+        snapshot: dict[str, Any],
+        language: str,
+        default_session_update: dict[str, Any],
+        default_order_status: str,
+        default_confirmation_status: str,
+    ) -> tuple[dict[str, Any], str, str, str, str, bool, dict[str, Any]]:
+        session_update = dict(default_session_update)
+        order_status = default_order_status
+        confirmation_status = default_confirmation_status
+        needs_human = interpretation.needs_human or interpretation.confidence < 0.55
+
+        if interpretation.edits:
+            pending_edits = list(snapshot.get("pending_edits") or [])
+            for edit in interpretation.edits:
+                pending_edits.append(
+                    {
+                        "field": edit.field,
+                        "value": edit.value,
+                        "received_at": to_iso(datetime.now(UTC)),
+                    }
+                )
+            snapshot["pending_edits"] = pending_edits
+
+        primary_action = interpretation.primary_action
+        secondary_actions = set(interpretation.secondary_actions)
+
+        if primary_action == "confirm" and not needs_human and not interpretation.edits:
+            session_update.update(
+                {
+                    "status": "confirmed",
+                    "confirmed_at": datetime.now(UTC),
+                    "needs_human": False,
+                }
+            )
+            return (
+                session_update,
+                "confirmed",
+                "confirmed",
+                "customer_confirmed_ai",
+                self._build_confirmed_reply(language, order_row),
+                False,
+                snapshot,
+            )
+
+        if primary_action == "decline":
+            session_update.update(
+                {
+                    "status": "declined",
+                    "declined_at": datetime.now(UTC),
+                    "needs_human": True,
+                    "structured_snapshot": snapshot,
+                }
+            )
+            return (
+                session_update,
+                "cancelled_by_customer",
+                "declined",
+                "customer_declined_ai",
+                self._build_declined_reply(language),
+                True,
+                snapshot,
+            )
+
+        if primary_action == "edit_request" or interpretation.edits or "edit_request" in secondary_actions:
+            session_update.update(
+                {
+                    "status": "edit_requested",
+                    "needs_human": True,
+                    "structured_snapshot": snapshot,
+                }
+            )
+            return (
+                session_update,
+                "needs_review",
+                "edit_requested",
+                "customer_requested_edit_ai",
+                self._build_edit_interpretation_reply(language, interpretation),
+                True,
+                snapshot,
+            )
+
+        if primary_action == "delivery_question":
+            session_update.update({"status": "awaiting_customer", "needs_human": False})
+            return (
+                session_update,
+                order_status,
+                confirmation_status,
+                "customer_asked_delivery_question",
+                self._build_delivery_question_reply(language, order_row, snapshot),
+                False,
+                snapshot,
+            )
+
+        if primary_action == "payment_question":
+            session_update.update({"status": "awaiting_customer", "needs_human": False})
+            return (
+                session_update,
+                order_status,
+                confirmation_status,
+                "customer_asked_payment_question",
+                self._build_payment_question_reply(language, order_row),
+                False,
+                snapshot,
+            )
+
+        if primary_action == "return_policy_question":
+            session_update.update({"status": "awaiting_customer", "needs_human": False})
+            return (
+                session_update,
+                order_status,
+                confirmation_status,
+                "customer_asked_return_policy_question",
+                self._build_return_policy_question_reply(language),
+                False,
+                snapshot,
+            )
+
+        if primary_action == "support_request" or needs_human:
+            session_update.update(
+                {
+                    "status": "human_requested",
+                    "needs_human": True,
+                    "structured_snapshot": snapshot,
+                }
+            )
+            return (
+                session_update,
+                "needs_review",
+                "human_requested",
+                "customer_requested_human_ai",
+                self._build_human_reply(language),
+                True,
+                snapshot,
+            )
+
+        session_update.update(
+            {
+                "status": "human_requested",
+                "needs_human": True,
+                "structured_snapshot": snapshot,
+            }
+        )
+        return (
+            session_update,
+            "needs_review",
+            "human_requested",
+            "customer_unrecognized_reply_ai",
+            self._build_fallback_reply(language),
+            True,
+            snapshot,
+        )
 
     async def list_sessions(
         self, business_id: int, *, status_value: str | None = None, limit: int = 50
@@ -480,25 +706,66 @@ class OrderConfirmationService:
         order_ref = str(order_row.get("external_order_id") or order_row.get("id"))
         customer_name = str(order_row.get("customer_name") or "").strip()
         name_prefix = f" {customer_name}" if customer_name else ""
+        items_line = items_summary or "-"
+        address_line = address or {
+            "english": "as shared on your order",
+            "french": "selon les informations de votre commande",
+            "darija": "b7al ma t9ayd f talab",
+        }[language]
+        action_menu = self._build_action_menu(language)
         if language == "english":
             return (
-                f"Hello{name_prefix}, thanks for your order from {business_name}. "
-                f"Order #{order_ref}: {items_summary}. Total: {amount}. "
-                f"Delivery: {address or 'as shared on your order'}. "
-                "Reply 1 to confirm, 2 to edit your details, 3 to cancel, or 4 to talk to support."
+                f"Hello{name_prefix} 👋\n\n"
+                f"Thanks for your order from *{business_name}*.\n\n"
+                f"🧾 Order: #{order_ref}\n"
+                f"📦 Items: {items_line}\n"
+                f"💰 Total: {amount}\n"
+                f"📍 Delivery: {address_line}\n\n"
+                "Please reply with one option:\n"
+                f"{action_menu}"
             )
         if language == "darija":
             return (
-                f"Salam{name_prefix}, shukran 3la talab dyalk m3a {business_name}. "
-                f"Commande #{order_ref}: {items_summary}. Total: {amount}. "
-                f"Delivery: {address or 'b7al ma t9ayd f talab'}. "
-                "Jawb b 1 bach tconfirmi, 2 ila bghiti tbdel chi 7aja, 3 ila bghiti tlghi, w 4 ila bghiti support."
+                f"Salam{name_prefix} 👋\n\n"
+                f"Shukran 3la talab dyalk m3a *{business_name}*.\n\n"
+                f"🧾 Commande: #{order_ref}\n"
+                f"📦 Talab: {items_line}\n"
+                f"💰 Total: {amount}\n"
+                f"📍 Delivery: {address_line}\n\n"
+                "Jawb b wa7ed l option:\n"
+                f"{action_menu}"
             )
         return (
-            f"Bonjour{name_prefix}, merci pour votre commande chez {business_name}. "
-            f"Commande #{order_ref}: {items_summary}. Total: {amount}. "
-            f"Livraison: {address or 'selon les informations de votre commande'}. "
-            "Répondez 1 pour confirmer, 2 pour modifier, 3 pour annuler ou 4 pour parler au support."
+            f"Bonjour{name_prefix} 👋\n\n"
+            f"Merci pour votre commande chez *{business_name}*.\n\n"
+            f"🧾 Commande : #{order_ref}\n"
+            f"📦 Articles : {items_line}\n"
+            f"💰 Total : {amount}\n"
+            f"📍 Livraison : {address_line}\n\n"
+            "Répondez avec une option :\n"
+            f"{action_menu}"
+        )
+
+    def _build_action_menu(self, language: str) -> str:
+        if language == "english":
+            return (
+                "1️⃣ Confirm order\n"
+                "2️⃣ Edit details\n"
+                "3️⃣ Cancel order\n"
+                "4️⃣ Talk to support"
+            )
+        if language == "darija":
+            return (
+                "1️⃣ Confirmi commande\n"
+                "2️⃣ Bdel chi 7aja\n"
+                "3️⃣ Lghi commande\n"
+                "4️⃣ Hder m3a support"
+            )
+        return (
+            "1️⃣ Confirmer la commande\n"
+            "2️⃣ Modifier les détails\n"
+            "3️⃣ Annuler la commande\n"
+            "4️⃣ Parler au support"
         )
 
     def _item_summary(self, item: dict[str, Any]) -> str:
@@ -519,38 +786,56 @@ class OrderConfirmationService:
             return "decline"
         if normalized in {"4", "agent", "support", "human", "personne", "call me", "n3ayet", "اتصل"}:
             return "request_human"
-
-        if any(token in normalized for token in ("confirm", "oui", "yes", "valide", "wakha", "موافق")):
-            return "confirm"
-        if any(token in normalized for token in ("cancel", "annul", "decline", "nlghi", "نلغي", "رفض")):
-            return "decline"
-        if any(token in normalized for token in ("edit", "change", "modifier", "بدل", "adresse", "address", "quantity", "taille", "color")):
-            return "request_edit"
-        if any(token in normalized for token in ("agent", "support", "human", "call", "phone", "whatsapp", "n3ayet", "اتصل")):
-            return "request_human"
         return None
 
     def _build_confirmed_reply(self, language: str, order_row: dict[str, Any]) -> str:
         order_ref = str(order_row.get("external_order_id") or order_row.get("id"))
         if language == "english":
-            return f"Thank you. Your order #{order_ref} is confirmed and will be prepared for the next step."
+            return (
+                f"✅ Thank you.\n\n"
+                f"Your order *#{order_ref}* is confirmed and will be prepared for the next step."
+            )
         if language == "darija":
-            return f"Shukran. Commande #{order_ref} tconfirmat, w ghadi nwjduha l marhala jaya."
-        return f"Merci. Votre commande #{order_ref} est confirmée et sera préparée pour la suite."
+            return (
+                f"✅ Shukran.\n\n"
+                f"Commande *#{order_ref}* tconfirmat, w ghadi nwjduha l marhala jaya."
+            )
+        return (
+            f"✅ Merci.\n\n"
+            f"Votre commande *#{order_ref}* est confirmée et sera préparée pour la suite."
+        )
 
     def _build_declined_reply(self, language: str) -> str:
         if language == "english":
-            return "Understood. We have marked this order as declined. Our support team can help if you need anything else."
+            return (
+                "📝 Understood.\n\n"
+                "We have marked this order as declined. Our support team can help if you need anything else."
+            )
         if language == "darija":
-            return "Wad7. Sjlna had commande comme annulée. Ila bghiti chi 7aja khra, support يقدر يعاونك."
-        return "C'est noté. Nous avons marqué cette commande comme annulée. Le support peut vous aider si besoin."
+            return (
+                "📝 Wad7.\n\n"
+                "Sjlna had commande comme annulée. Ila bghiti chi 7aja khra, support y9der y3awnek."
+            )
+        return (
+            "📝 C'est noté.\n\n"
+            "Nous avons marqué cette commande comme annulée. Le support peut vous aider si besoin."
+        )
 
     def _build_edit_reply(self, language: str) -> str:
         if language == "english":
-            return "Please reply with the details you want to change, such as address, phone number, quantity, or variant. Our team will review it."
+            return (
+                "✏️ Sure.\n\n"
+                "Please reply with what you want to change, such as address, phone number, quantity, or variant. Our team will review it."
+            )
         if language == "darija":
-            return "Jawbna b dakchi li bghiti tbdel, b7al l'adresse, numéro, quantité, ولا variant, w l'équipe dyalna ghadi tراجعو."
-        return "Répondez avec les éléments à modifier, comme l'adresse, le numéro, la quantité ou la variante, et notre équipe va vérifier."
+            return (
+                "✏️ Wakha.\n\n"
+                "Jawbna b dakchi li bghiti tbdel, b7al l'adresse, numéro, quantité, wela variant, w l'équipe dyalna ghadi tراجعو."
+            )
+        return (
+            "✏️ Très bien.\n\n"
+            "Répondez avec les éléments à modifier, comme l'adresse, le numéro, la quantité ou la variante, et notre équipe va vérifier."
+        )
 
     def _build_edit_details_reply(self, language: str) -> str:
         if language == "english":
@@ -559,16 +844,133 @@ class OrderConfirmationService:
             return "Shukran, tsjlat talab dyal التعديل. L'équipe dyalna ghadi tراجعو w ترجع ليك ف WhatsApp."
         return "Merci, votre demande de modification a bien été reçue. Notre équipe va la vérifier et revenir vers vous sur WhatsApp."
 
+    def _build_edit_interpretation_reply(
+        self, language: str, interpretation: OrderSessionInterpretation
+    ) -> str:
+        changes = ", ".join(f"{edit.field}: {edit.value}" for edit in interpretation.edits[:3])
+        if language == "english":
+            if changes:
+                return (
+                    "✏️ Understood.\n\n"
+                    f"I noted these requested changes: {changes}.\n"
+                    "Our team will review them and continue with you on WhatsApp."
+                )
+            return (
+                "✏️ Understood.\n\n"
+                "I noted your change request and our team will review it with you on WhatsApp."
+            )
+        if language == "darija":
+            if changes:
+                return (
+                    "✏️ Wad7.\n\n"
+                    f"Tsjlo had talabat dyal التعديل: {changes}.\n"
+                    "L'équipe dyalna ghadi tراجعهم w تكمل m3ak f WhatsApp."
+                )
+            return (
+                "✏️ Wad7.\n\n"
+                "Tsjlat talab dyal التعديل, w l'équipe dyalna ghadi تكمل m3ak f WhatsApp."
+            )
+        if changes:
+            return (
+                "✏️ C'est noté.\n\n"
+                f"J'ai enregistré ces changements demandés : {changes}.\n"
+                "Notre équipe va les vérifier et poursuivre avec vous sur WhatsApp."
+            )
+        return (
+            "✏️ C'est noté.\n\n"
+            "Votre demande de modification a été enregistrée et notre équipe poursuivra avec vous sur WhatsApp."
+        )
+
+    def _build_delivery_question_reply(
+        self, language: str, order_row: dict[str, Any], snapshot: dict[str, Any]
+    ) -> str:
+        city = str(order_row.get("delivery_city") or snapshot.get("delivery_city") or "").strip()
+        address = str(order_row.get("delivery_address") or snapshot.get("delivery_address") or "").strip()
+        if language == "english":
+            return (
+                "📍 Delivery details\n\n"
+                f"Current address: {city}, {address}\n\n"
+                "If this is correct, reply 1 to confirm.\n"
+                "If you want to change it, send the new details."
+            ).strip()
+        if language == "darija":
+            return (
+                "📍 Delivery details\n\n"
+                f"Les infos li 3andna daba: {city}, {address}\n\n"
+                "Ila صحاح jawb b 1 bach tconfirmi.\n"
+                "Ila bghiti tbdelhom, sift l details jdod."
+            ).strip()
+        return (
+            "📍 Détails de livraison\n\n"
+            f"Adresse actuelle : {city}, {address}\n\n"
+            "Si c'est correct, répondez 1 pour confirmer.\n"
+            "Sinon, envoyez les nouvelles informations."
+        ).strip()
+
+    def _build_payment_question_reply(self, language: str, order_row: dict[str, Any]) -> str:
+        payment_method = str(order_row.get("payment_method") or "cash_on_delivery").replace("_", " ")
+        if language == "english":
+            return (
+                "💳 Payment details\n\n"
+                f"The payment method on this order is {payment_method}.\n"
+                "If you want a change, reply with the new request and our team will review it."
+            )
+        if language == "darija":
+            return (
+                "💳 Paiement\n\n"
+                f"Tariqat l paiement f had commande hiya {payment_method}.\n"
+                "Ila bghiti tbdelha, sift talab dyalk w l'équipe ghadi tراجعو."
+            )
+        return (
+            "💳 Paiement\n\n"
+            f"Le mode de paiement actuel pour cette commande est {payment_method}.\n"
+            "Si vous voulez le modifier, envoyez votre demande et notre équipe va la vérifier."
+        )
+
+    def _build_return_policy_question_reply(self, language: str) -> str:
+        if language == "english":
+            return (
+                "↩️ Return policy\n\n"
+                "For return-policy questions related to this order, our support team will guide you on WhatsApp."
+            )
+        if language == "darija":
+            return (
+                "↩️ Return policy\n\n"
+                "Bnisba l politique dyal l return f had commande, support dyalna ghadi yشرحها ليك f WhatsApp."
+            )
+        return (
+            "↩️ Politique de retour\n\n"
+            "Pour les questions de retour liées à cette commande, notre équipe support va vous guider sur WhatsApp."
+        )
+
     def _build_human_reply(self, language: str) -> str:
         if language == "english":
-            return "Understood. We are handing this order to a human agent who will continue with you on WhatsApp."
+            return (
+                "🤝 Understood.\n\n"
+                "We are handing this order to a human agent who will continue with you on WhatsApp."
+            )
         if language == "darija":
-            return "Wad7. Ghadi نحولو had commande l agent bach يكمل m3ak f WhatsApp."
-        return "Bien reçu. Nous passons cette commande à un agent humain qui poursuivra avec vous sur WhatsApp."
+            return (
+                "🤝 Wad7.\n\n"
+                "Ghadi n7awlo had commande l agent bach ykمل m3ak f WhatsApp."
+            )
+        return (
+            "🤝 Bien reçu.\n\n"
+            "Nous passons cette commande à un agent humain qui poursuivra avec vous sur WhatsApp."
+        )
 
     def _build_fallback_reply(self, language: str) -> str:
         if language == "english":
-            return "I did not fully understand your reply for this order confirmation. A support agent will continue with you on WhatsApp."
+            return (
+                "🤝 I did not fully understand your reply.\n\n"
+                "A support agent will continue with you on WhatsApp."
+            )
         if language == "darija":
-            return "Ma fhemtch mzyan jawab dyalk bnisba l confirmation dyal had commande. Support ghadi يكمل m3ak f WhatsApp."
-        return "Je n'ai pas bien compris votre réponse pour cette confirmation de commande. Un agent support va poursuivre avec vous sur WhatsApp."
+            return (
+                "🤝 Ma fhemtch mzyan jawab dyalk.\n\n"
+                "Support ghadi ykمل m3ak f WhatsApp."
+            )
+        return (
+            "🤝 Je n'ai pas bien compris votre réponse.\n\n"
+            "Un agent support va poursuivre avec vous sur WhatsApp."
+        )

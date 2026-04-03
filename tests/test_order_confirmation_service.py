@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from app.schemas.order_confirmation import OrderConfirmationActionRequest, StoreOrderIngestRequest
+from app.schemas.order_confirmation import (
+    OrderConfirmationActionRequest,
+    OrderSessionInterpretation,
+    StoreOrderIngestRequest,
+)
 from app.services.order_confirmation_service import OrderConfirmationService
 
 
@@ -28,6 +32,49 @@ class FakeProvider:
 class FakeLLMProvider:
     async def detect_language(self, *, message: str):
         return "darija", {"language_detection": {"language": "darija"}}
+
+    async def interpret_order_session(
+        self,
+        *,
+        customer_message: str,
+        preferred_language: str | None,
+        session_status: str,
+        order_snapshot: dict,
+    ):
+        lowered = customer_message.lower()
+        if "livraison" in lowered or "delivery" in lowered:
+            return (
+                OrderSessionInterpretation(
+                    language="french",
+                    primary_action="delivery_question",
+                    confidence=0.9,
+                    question_type="delivery_status",
+                    reply_summary="Customer asks about delivery details.",
+                ),
+                {},
+            )
+        if "address" in lowered or "adresse" in lowered:
+            return (
+                OrderSessionInterpretation(
+                    language="french",
+                    primary_action="edit_request",
+                    secondary_actions=["confirm"],
+                    confidence=0.92,
+                    edits=[{"field": "delivery_address", "value": "Hay Hassani, Casablanca"}],
+                    reply_summary="Customer confirms the order but wants to change the address.",
+                ),
+                {},
+            )
+        return (
+            OrderSessionInterpretation(
+                language="darija",
+                primary_action="support_request",
+                confidence=0.6,
+                needs_human=True,
+                reply_summary="Fallback support request.",
+            ),
+            {},
+        )
 
 
 class FakeBusinessRepository:
@@ -230,7 +277,8 @@ def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
     assert confirmation_repository.session["status"] == "awaiting_customer"
     assert len(chat_repository.messages) == 1
-    assert "Répondez 1 pour confirmer" in chat_repository.messages[0]["text"]
+    assert "🧾 Commande" in chat_repository.messages[0]["text"]
+    assert "1️⃣ Confirmer la commande" in chat_repository.messages[0]["text"]
 
 
 def test_handle_inbound_confirm_marks_session_confirmed() -> None:
@@ -355,3 +403,150 @@ def test_apply_action_resend_reopens_session() -> None:
     assert detail["status"] == "awaiting_customer"
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
     assert len(chat_repository.messages) == 1
+
+
+def test_handle_inbound_custom_edit_reply_uses_ai_interpretation() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    confirmation_repository.session = {
+        "id": 21,
+        "business_id": 2,
+        "order_id": 10,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "french",
+        "status": "awaiting_customer",
+        "needs_human": False,
+        "last_detected_intent": "order_confirmation_pending",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": None,
+        "confirmed_at": None,
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {},
+    }
+    order_repository.row = {
+        "id": 10,
+        "business_id": 2,
+        "source_store": "generic",
+        "external_order_id": "WC-1001",
+        "customer_name": "Lina",
+        "customer_phone": "+212600000001",
+        "preferred_language": "french",
+        "total_amount": 3499,
+        "currency": "MAD",
+        "payment_method": "cash_on_delivery",
+        "delivery_city": "Casablanca",
+        "delivery_address": "Maarif",
+        "order_notes": None,
+        "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+        "metadata": {},
+        "raw_payload": {},
+        "status": "pending_confirmation",
+        "confirmation_status": "awaiting_customer",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+
+    import asyncio
+
+    handled = asyncio.run(
+        service.handle_inbound_message(
+            connection={
+                "business_id": 2,
+                "config": {
+                    "provider": "twilio",
+                    "onboarding_status": "connected",
+                    "subaccount_sid": "AC123",
+                    "sender_sid": "PN123",
+                    "whatsapp_number": "+14155238886",
+                },
+            },
+            inbound_row={
+                "id": 55,
+                "phone": "+212600000001",
+                "text": "Oui je confirme mais changez mon adresse à Hay Hassani",
+            },
+        )
+    )
+
+    assert handled is True
+    assert confirmation_repository.session["status"] == "edit_requested"
+    assert order_repository.row["confirmation_status"] == "edit_requested"
+    pending_edits = confirmation_repository.session["structured_snapshot"]["pending_edits"]
+    assert pending_edits[0]["field"] == "delivery_address"
+    assert "Hay Hassani" in pending_edits[0]["value"]
+    assert "changements demandés" in chat_repository.messages[0]["text"]
+
+
+def test_handle_inbound_delivery_question_answers_without_handoff() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    confirmation_repository.session = {
+        "id": 21,
+        "business_id": 2,
+        "order_id": 10,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "french",
+        "status": "awaiting_customer",
+        "needs_human": False,
+        "last_detected_intent": "order_confirmation_pending",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": None,
+        "confirmed_at": None,
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {
+            "delivery_city": "Casablanca",
+            "delivery_address": "Maarif",
+        },
+    }
+    order_repository.row = {
+        "id": 10,
+        "business_id": 2,
+        "source_store": "generic",
+        "external_order_id": "WC-1001",
+        "customer_name": "Lina",
+        "customer_phone": "+212600000001",
+        "preferred_language": "french",
+        "total_amount": 3499,
+        "currency": "MAD",
+        "payment_method": "cash_on_delivery",
+        "delivery_city": "Casablanca",
+        "delivery_address": "Maarif",
+        "order_notes": None,
+        "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+        "metadata": {},
+        "raw_payload": {},
+        "status": "pending_confirmation",
+        "confirmation_status": "awaiting_customer",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+
+    import asyncio
+
+    handled = asyncio.run(
+        service.handle_inbound_message(
+            connection={
+                "business_id": 2,
+                "config": {
+                    "provider": "twilio",
+                    "onboarding_status": "connected",
+                    "subaccount_sid": "AC123",
+                    "sender_sid": "PN123",
+                    "whatsapp_number": "+14155238886",
+                },
+            },
+            inbound_row={
+                "id": 56,
+                "phone": "+212600000001",
+                "text": "C'est quoi l'adresse de livraison actuelle ?",
+            },
+        )
+    )
+
+    assert handled is True
+    assert confirmation_repository.session["status"] == "awaiting_customer"
+    assert order_repository.row["confirmation_status"] == "awaiting_customer"
+    assert chat_repository.analysis_updates == [(56, "autre", False)]
+    assert "📍 Détails de livraison" in chat_repository.messages[0]["text"]

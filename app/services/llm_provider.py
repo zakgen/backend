@@ -3,6 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 
 from app.schemas.ai import AIModelReply
+from app.schemas.order_confirmation import OrderSessionInterpretation
 
 
 class AbstractLLMProvider(ABC):
@@ -17,4 +18,15 @@ class AbstractLLMProvider(ABC):
 
     @abstractmethod
     async def detect_language(self, *, message: str) -> tuple[str, dict]:
+        raise NotImplementedError
+
+    @abstractmethod
+    async def interpret_order_session(
+        self,
+        *,
+        customer_message: str,
+        preferred_language: str | None,
+        session_status: str,
+        order_snapshot: dict,
+    ) -> tuple[OrderSessionInterpretation, dict]:
         raise NotImplementedError
