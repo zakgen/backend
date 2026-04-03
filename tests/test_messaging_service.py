@@ -84,6 +84,14 @@ class FakeChatRepository:
 def test_handle_inbound_webhook_triggers_ai_processing(monkeypatch) -> None:
     ai_calls: list[tuple[dict, dict]] = []
 
+    class FakeOrderConfirmationService:
+        def __init__(self, *, session, messaging_provider) -> None:
+            self.session = session
+            self.messaging_provider = messaging_provider
+
+        async def handle_inbound_message(self, *, connection, inbound_row):
+            return False
+
     class FakeAIReplyService:
         def __init__(self, *, session, messaging_provider) -> None:
             self.session = session
@@ -93,9 +101,15 @@ def test_handle_inbound_webhook_triggers_ai_processing(monkeypatch) -> None:
             ai_calls.append((connection, inbound_row))
             return None
 
-    service = MessagingService(session=object(), provider=FakeProvider())
+    service = MessagingService(
+        session=type("DummyRepoSession", (), {"db": None})(),
+        provider=FakeProvider(),
+    )
     service.integration_repository = FakeIntegrationRepository()
     service.chat_repository = FakeChatRepository()
+    monkeypatch.setattr(
+        messaging_service_module, "OrderConfirmationService", FakeOrderConfirmationService
+    )
     monkeypatch.setattr(messaging_service_module, "AIReplyService", FakeAIReplyService)
 
     import asyncio
@@ -115,6 +129,14 @@ def test_handle_inbound_webhook_triggers_ai_processing(monkeypatch) -> None:
 
 
 def test_handle_inbound_webhook_marks_message_for_human_when_ai_fails(monkeypatch) -> None:
+    class FakeOrderConfirmationService:
+        def __init__(self, *, session, messaging_provider) -> None:
+            self.session = session
+            self.messaging_provider = messaging_provider
+
+        async def handle_inbound_message(self, *, connection, inbound_row):
+            return False
+
     class FakeAIReplyService:
         def __init__(self, *, session, messaging_provider) -> None:
             self.session = session
@@ -123,10 +145,16 @@ def test_handle_inbound_webhook_marks_message_for_human_when_ai_fails(monkeypatc
         async def process_inbound_message(self, *, connection, inbound_row):
             raise RuntimeError("model failure")
 
-    service = MessagingService(session=object(), provider=FakeProvider())
+    service = MessagingService(
+        session=type("DummyRepoSession", (), {"db": None})(),
+        provider=FakeProvider(),
+    )
     service.integration_repository = FakeIntegrationRepository()
     chat_repository = FakeChatRepository()
     service.chat_repository = chat_repository
+    monkeypatch.setattr(
+        messaging_service_module, "OrderConfirmationService", FakeOrderConfirmationService
+    )
     monkeypatch.setattr(messaging_service_module, "AIReplyService", FakeAIReplyService)
 
     import asyncio
@@ -141,3 +169,51 @@ def test_handle_inbound_webhook_marks_message_for_human_when_ai_fails(monkeypatc
 
     assert row["id"] == 55
     assert chat_repository.analysis_updates == [(55, None, True)]
+
+
+def test_handle_inbound_webhook_uses_order_confirmation_before_ai(monkeypatch) -> None:
+    ai_calls: list[tuple[dict, dict]] = []
+    confirmation_calls: list[tuple[dict, dict]] = []
+
+    class FakeOrderConfirmationService:
+        def __init__(self, *, session, messaging_provider) -> None:
+            self.session = session
+            self.messaging_provider = messaging_provider
+
+        async def handle_inbound_message(self, *, connection, inbound_row):
+            confirmation_calls.append((connection, inbound_row))
+            return True
+
+    class FakeAIReplyService:
+        def __init__(self, *, session, messaging_provider) -> None:
+            self.session = session
+            self.messaging_provider = messaging_provider
+
+        async def process_inbound_message(self, *, connection, inbound_row):
+            ai_calls.append((connection, inbound_row))
+            return None
+
+    service = MessagingService(
+        session=type("DummyRepoSession", (), {"db": None})(),
+        provider=FakeProvider(),
+    )
+    service.integration_repository = FakeIntegrationRepository()
+    service.chat_repository = FakeChatRepository()
+    monkeypatch.setattr(
+        messaging_service_module, "OrderConfirmationService", FakeOrderConfirmationService
+    )
+    monkeypatch.setattr(messaging_service_module, "AIReplyService", FakeAIReplyService)
+
+    import asyncio
+
+    row = asyncio.run(
+        service.handle_inbound_webhook(
+            url="https://example.com/webhooks/twilio/whatsapp/inbound",
+            headers={},
+            params={"MessageSid": "SM123", "AccountSid": "AC123"},
+        )
+    )
+
+    assert row["id"] == 55
+    assert confirmation_calls
+    assert not ai_calls

@@ -21,7 +21,38 @@ ZakBot is a production-minded FastAPI backend that gives an n8n workflow busines
 - Performs business-scoped semantic search only
 - Exposes dashboard-oriented business, product, chat, integration, and sync-status routes
 - Supports provider-agnostic messaging with a Twilio WhatsApp implementation
+- Supports WhatsApp-first order confirmation sessions triggered from store order ingestion
 - Returns stable JSON for n8n consumption
+
+## Order confirmation v1
+
+The backend now supports a first working order-confirmation flow on top of the existing WhatsApp pipeline.
+
+What it does:
+
+- ingests store orders through the API
+- creates an internal order confirmation session per order
+- sends a WhatsApp confirmation prompt to the customer
+- routes inbound WhatsApp replies into the active confirmation session before the generic AI sales assistant
+- handles core customer actions deterministically:
+  - confirm
+  - request edit
+  - decline
+  - request human support
+- stores confirmation events for auditability
+
+Current v1 scope:
+
+- store order ingestion is generic API-based for now
+- provider-specific Shopify/WooCommerce onboarding is intentionally deferred
+- free-text replies outside the confirmation flow are escalated to a human instead of pretending to manage the whole order conversationally
+
+Main endpoints:
+
+- `POST /business/{business_id}/order-confirmations/orders`
+- `GET /business/{business_id}/order-confirmations/sessions`
+- `GET /business/{business_id}/order-confirmations/sessions/{session_id}`
+- `POST /business/{business_id}/order-confirmations/sessions/{session_id}/actions`
 
 ## Repository layout
 
@@ -207,7 +238,8 @@ If you want to use Supabase instead of the local database:
 5. Run `migrations/003_twilio_messaging.sql`.
 6. Run `migrations/004_ai_reply_runs.sql`.
 7. Run `migrations/005_add_infos_boutique_intent.sql`.
-8. Confirm `pgvector` is enabled and the tables were created.
+8. Run `migrations/006_order_confirmations.sql`.
+9. Confirm `pgvector` is enabled and the tables were created.
 
 ## Run the API
 

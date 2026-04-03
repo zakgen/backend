@@ -137,8 +137,6 @@ def _should_prioritize_product_availability(normalized: str) -> bool:
         "kayna",
         "باقي",
         "مقطوع",
-        "rega3",
-        "رجع",
     )
     product_markers = (
         "product",

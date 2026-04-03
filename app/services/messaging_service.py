@@ -14,6 +14,7 @@ from app.services.ai_reply_service import AIReplyService
 from app.services.dashboard_service import build_whatsapp_integration, chat_row_to_message, to_iso
 from app.services.messaging_provider import AbstractMessagingProvider
 from app.services.messaging_types import ConnectionState, SendMessageCommand
+from app.services.order_confirmation_service import OrderConfirmationService
 from app.services.repository_factory import RepositoryFactory
 
 
@@ -223,6 +224,16 @@ class MessagingService:
             touch_last_activity=True,
         )
         try:
+            confirmation_service = OrderConfirmationService(
+                session=self.session,
+                messaging_provider=self.provider,
+            )
+            handled = await confirmation_service.handle_inbound_message(
+                connection=connection,
+                inbound_row=row,
+            )
+            if handled:
+                return row
             ai_service = AIReplyService(
                 session=self.session,
                 messaging_provider=self.provider,

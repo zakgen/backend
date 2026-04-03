@@ -13,6 +13,14 @@ from app.services.mongo_repositories import (
     MongoProductRepository,
     MongoSyncStatusRepository,
 )
+from app.services.mongo_order_repositories import (
+    MongoOrderConfirmationRepository,
+    MongoOrderRepository,
+)
+from app.services.order_repositories import (
+    OrderConfirmationRepository,
+    OrderRepository,
+)
 from app.services.repositories import (
     AIRunRepository,
     BusinessRepository,
@@ -73,3 +81,15 @@ class RepositoryFactory:
         if self._is_mongo():
             return MongoAIRunRepository(self.session)
         return AIRunRepository(self.session)
+
+    def orders(self) -> OrderRepository | MongoOrderRepository:
+        if self._is_mongo():
+            return MongoOrderRepository(self.session)
+        return OrderRepository(self.session)
+
+    def order_confirmations(
+        self,
+    ) -> OrderConfirmationRepository | MongoOrderConfirmationRepository:
+        if self._is_mongo():
+            return MongoOrderConfirmationRepository(self.session)
+        return OrderConfirmationRepository(self.session)
