@@ -93,3 +93,39 @@ def test_validation_accepts_business_fact_sources_when_available() -> None:
     assert decision == "send"
     assert reason == "grounded_answer"
     assert validated.used_sources[0].type == "business_fact"
+
+
+def test_validation_escalates_reply_that_denies_available_facts() -> None:
+    service = ReplyValidationService(_settings())
+    reply = AIModelReply(
+        reply_text="I don't have information about our opening hours.",
+        intent="infos_boutique",
+        language="en",
+        grounded=True,
+        confidence=0.95,
+        used_sources=[
+            AISourceReference(
+                type="business_fact",
+                id="opening_hours",
+                name="Opening Hours",
+                score=1.0,
+            )
+        ],
+    )
+
+    validated, decision, reason = service.validate(
+        reply,
+        available_sources=[
+            {
+                "type": "business_fact",
+                "id": "opening_hours",
+                "name": "Opening Hours",
+                "score": 1.0,
+                "metadata": {"source_type": "business_profile", "fact_key": "opening_hours"},
+            }
+        ],
+    )
+
+    assert decision == "needs_human"
+    assert reason == "contradicted_by_available_facts"
+    assert validated.grounded is False

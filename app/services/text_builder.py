@@ -72,6 +72,23 @@ def build_business_profile_text(business: Mapping[str, Any]) -> str:
     _append(parts, "Payment methods", _join_list(business.get("payment_methods")))
 
     profile_metadata = business.get("profile_metadata") or {}
+    for key, label in (
+        ("opening_hours", "Opening hours"),
+        ("store_address", "Store address"),
+        ("support_phone", "Support phone"),
+        ("whatsapp_number", "WhatsApp number"),
+        ("support_email", "Support email"),
+        ("delivery_time", "Delivery time"),
+        ("delivery_tracking_method", "Delivery tracking"),
+        ("return_policy", "Return policy"),
+        ("return_window_days", "Return window days"),
+        ("return_conditions", "Return conditions"),
+    ):
+        value = profile_metadata.get(key)
+        if isinstance(value, list):
+            _append(parts, label, _join_list(value))
+        else:
+            _append(parts, label, value)
     if profile_metadata:
         flat_metadata = ", ".join(
             f"{key}={value}" for key, value in profile_metadata.items() if value is not None

@@ -6,6 +6,7 @@ from app.schemas.business import BusinessProfile
 from app.services.dashboard_service import (
     build_conversation_summaries,
     build_setup_checklist,
+    business_row_to_profile,
     derive_sync_status,
     product_row_to_dashboard,
 )
@@ -124,3 +125,42 @@ def test_build_setup_checklist_counts_completed_items() -> None:
     assert checklist.total == 3
     assert checklist.items[-1].id == "whatsapp"
     assert checklist.items[-1].completed is False
+
+
+def test_business_row_to_profile_maps_extended_support_fields() -> None:
+    profile = business_row_to_profile(
+        {
+            "id": 5,
+            "name": "Atlas Gadget Hub",
+            "description": "Electronics store",
+            "city": "Casablanca",
+            "shipping_policy": "Delivery available",
+            "delivery_zones": ["Casablanca", "Rabat"],
+            "payment_methods": ["cash_on_delivery"],
+            "profile_metadata": {
+                "supported_languages": ["english", "darija"],
+                "tone_of_voice": "professional",
+                "opening_hours": ["Monday to Friday: 09:00-19:00", "Saturday: 10:00-17:00"],
+                "store_address": "27 Rue Al Massira, Maarif, Casablanca, Morocco",
+                "support_phone": "+212522450980",
+                "whatsapp_number": "+212661234567",
+                "support_email": "support@atlasgadgethub.ma",
+                "delivery_time": "24 to 48 hours",
+                "delivery_tracking_method": "WhatsApp tracking",
+                "delivery_zone_details": [{"city": "Rabat", "fee_mad": 35}],
+                "return_policy": "Returns accepted",
+                "return_window_days": 7,
+                "return_conditions": ["Unused product", "Original packaging"],
+                "escalation_contact": "WhatsApp support",
+            },
+            "updated_at": datetime(2026, 3, 29, 13, 0, tzinfo=UTC),
+        },
+        [],
+    )
+
+    assert profile.store_address == "27 Rue Al Massira, Maarif, Casablanca, Morocco"
+    assert profile.support_phone == "+212522450980"
+    assert profile.whatsapp_number == "+212661234567"
+    assert profile.support_email == "support@atlasgadgethub.ma"
+    assert profile.return_window_days == 7
+    assert profile.return_conditions == ["Unused product", "Original packaging"]

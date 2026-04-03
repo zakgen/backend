@@ -13,6 +13,7 @@ ConversationIntent = Literal[
     "retour",
     "paiement",
     "infos_produit",
+    "infos_boutique",
     "autre",
 ]
 

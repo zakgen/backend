@@ -1,0 +1,134 @@
+{
+  "business": {
+    "name": "Atlas Gadget Hub",
+    "legal_name": "Atlas Gadget Hub SARL",
+    "description": "Moroccan electronics and accessories store focused on affordable smartphones, audio gear, mobile accessories, and smart home gadgets.",
+    "category": "Electronics Retail",
+    "location": {
+      "address": "27 Rue Al Massira, Maarif",
+      "city": "Casablanca",
+      "country": "Morocco"
+    },
+    "contact": {
+      "phone": "+212522450980",
+      "whatsapp": "+212661234567",
+      "email": "support@atlasgadgethub.ma"
+    },
+    "working_hours": {
+      "monday_to_friday": "09:00-19:00",
+      "saturday": "10:00-17:00",
+      "sunday": "Closed"
+    },
+    "supported_languages": [
+      "english",
+      "french",
+      "darija"
+    ],
+    "tone_of_voice": "professional_friendly",
+    "payment_methods": [
+      "cash_on_delivery",
+      "card_payment"
+    ]
+  },
+  "return_policy": {
+    "window_days": 7,
+    "conditions": [
+      "Product must be unused and returned with original packaging.",
+      "Opened audio accessories can only be returned if defective.",
+      "Refunds are processed within 5 business days after inspection."
+    ]
+  },
+  "delivery": {
+    "tracking_available": true,
+    "tracking_method": "WhatsApp confirmation message with tracking reference when the courier updates the shipment.",
+    "zones": [
+      {
+        "city": "Casablanca",
+        "fee_mad": 20,
+        "estimated_time": "Same day or next day"
+      },
+      {
+        "city": "Rabat",
+        "fee_mad": 35,
+        "estimated_time": "24 to 48 hours"
+      },
+      {
+        "city": "Marrakech",
+        "fee_mad": 40,
+        "estimated_time": "24 to 48 hours"
+      },
+      {
+        "city": "Tangier",
+        "fee_mad": 45,
+        "estimated_time": "48 to 72 hours"
+      },
+      {
+        "city": "Agadir",
+        "fee_mad": 45,
+        "estimated_time": "48 to 72 hours"
+      }
+    ]
+  },
+  "orders": {
+    "managed_in_app": false,
+    "handoff_policy": "Order status, changes, cancellations, and complaints are handled manually by the support team via WhatsApp, phone, or email during business hours."
+  },
+  "products": [
+    {
+      "sku": "ATL-PHN-001",
+      "name": "Redmi Note 13 8GB/256GB",
+      "description": "Android smartphone with AMOLED display and long battery life.",
+      "category": "Smartphones",
+      "price_mad": 2899,
+      "availability": "in_stock"
+    },
+    {
+      "sku": "ATL-AUD-002",
+      "name": "Anker Soundcore R50i Earbuds",
+      "description": "Wireless earbuds with charging case and clear call audio.",
+      "category": "Audio",
+      "price_mad": 349,
+      "availability": "in_stock"
+    },
+    {
+      "sku": "ATL-ACC-003",
+      "name": "Baseus 20000mAh Power Bank",
+      "description": "Fast-charging power bank with USB-C input and output.",
+      "category": "Accessories",
+      "price_mad": 499,
+      "availability": "in_stock"
+    },
+    {
+      "sku": "ATL-WEA-004",
+      "name": "Amazfit Bip 5 Smartwatch",
+      "description": "Smartwatch with fitness tracking and Bluetooth calling.",
+      "category": "Wearables",
+      "price_mad": 1099,
+      "availability": "in_stock"
+    },
+    {
+      "sku": "ATL-SPK-005",
+      "name": "JBL Go 3 Speaker",
+      "description": "Portable Bluetooth speaker with compact waterproof design.",
+      "category": "Audio",
+      "price_mad": 599,
+      "availability": "out_of_stock"
+    },
+    {
+      "sku": "ATL-HOM-006",
+      "name": "TP-Link Tapo C200 Camera",
+      "description": "Indoor smart security camera with night vision and app alerts.",
+      "category": "Smart Home",
+      "price_mad": 429,
+      "availability": "in_stock"
+    },
+    {
+      "sku": "ATL-ACC-007",
+      "name": "Ugreen Laptop Stand",
+      "description": "Foldable aluminum stand for laptops up to 15.6 inches.",
+      "category": "Accessories",
+      "price_mad": 259,
+      "availability": "in_stock"
+    }
+  ]
+}

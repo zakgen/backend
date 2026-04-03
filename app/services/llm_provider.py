@@ -14,3 +14,7 @@ class AbstractLLMProvider(ABC):
         self, *, system_prompt: str, user_prompt: str
     ) -> tuple[AIModelReply, dict]:
         raise NotImplementedError
+
+    @abstractmethod
+    async def detect_language(self, *, message: str) -> tuple[str, dict]:
+        raise NotImplementedError

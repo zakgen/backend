@@ -51,6 +51,11 @@ def build_ai_reply_prompts(
         f"Niche: {business_profile.niche}",
         f"Tone of voice: {business_profile.tone_of_voice}",
         f"Supported languages: {_safe_join(business_profile.supported_languages)}",
+        f"Store address: {business_profile.store_address or ''}",
+        f"Support phone: {business_profile.support_phone or ''}",
+        f"WhatsApp number: {business_profile.whatsapp_number or ''}",
+        f"Support email: {business_profile.support_email or ''}",
+        f"Opening hours: {_safe_join(business_profile.opening_hours)}",
     ]
 
     evidence_block = (
@@ -66,6 +71,11 @@ Never invent delivery zones, prices, stock, return policy, payment methods, or p
 If evidence is weak or missing, set needs_human=true or ask a short clarifying question.
 Mirror the customer's language/register when possible while keeping the store tone.
 Keep answers concise and WhatsApp-friendly.
+If the answer exists in business facts or retrieved evidence, answer directly instead of saying information is unavailable.
+Answer every part of a multi-part question in one reply.
+For contact questions, include explicit labels such as WhatsApp, phone, and email when relevant.
+For unsupported order-management requests, state clearly that order management is handled by support and provide support contact details.
+For Darija messages, prefer natural Moroccan Darija and avoid switching to formal Arabic unless the customer uses it.
 
 Return valid JSON with exactly these fields:
 - reply_text: string or null
@@ -105,6 +115,7 @@ Instructions:
 - used_sources must reuse exact source entries from the retrieved evidence block, including the same type and id.
 - Allowed source types are product, faq, business_knowledge, and business_fact.
 - If the user asks about unsupported or missing merchant information, do not guess.
+- Do not ask for clarification if the requested fact is already present in the evidence.
 - If a clarifying question is the safest reply, put it in reply_text and optionally repeat it in follow_up_question.
 - If human intervention is needed, set needs_human=true.
 """.strip()

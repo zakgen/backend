@@ -206,7 +206,8 @@ If you want to use Supabase instead of the local database:
 4. Run `migrations/002_dashboard_support.sql`.
 5. Run `migrations/003_twilio_messaging.sql`.
 6. Run `migrations/004_ai_reply_runs.sql`.
-7. Confirm `pgvector` is enabled and the tables were created.
+7. Run `migrations/005_add_infos_boutique_intent.sql`.
+8. Confirm `pgvector` is enabled and the tables were created.
 
 ## Run the API
 
@@ -219,6 +220,110 @@ Or with Docker:
 ```bash
 docker compose up --build
 ```
+
+## Automated evaluation pipeline
+
+This repo now includes an end-to-end evaluator for the AI reply service. The evaluator:
+
+- seeds a temporary business, products, and FAQs into the configured database
+- generates 30 realistic customer queries across English, French, and Darija
+- calls the backend reply endpoint for each query
+- scores every response with an LLM judge grounded against [`data/business_profile.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/data/business_profile.json)
+- produces structured JSON and Markdown reports
+
+### Evaluation files
+
+```text
+data/
+  business_profile.json
+  query_templates.json
+queries/
+  query_generator.py
+evaluator/
+  config.py
+  models.py
+  service_caller.py
+  scorer.py
+  report_generator.py
+run_eval.py
+reports/
+```
+
+### Evaluation setup
+
+Set these variables in `.env`:
+
+- `BASE_URL`: backend API base URL, for example `http://localhost:8000`
+- `OPENAI_API_KEY`: judge-model API key
+- `JUDGE_MODEL`: judge model name, default `gpt-4.1-mini`
+- `REQUEST_TIMEOUT_SECONDS`: per-request timeout for backend calls
+- `MAX_CONCURRENCY`: parallel backend call limit
+- `JUDGE_MAX_CONCURRENCY`: parallel judge call limit
+- `SEED_EVAL_DATA`: when `true`, create evaluator-owned business data before the run
+- `CLEANUP_SEED_DATA`: when `true`, delete the seeded business after the run completes
+- `BUSINESS_ID`: only used when `SEED_EVAL_DATA=false`
+
+If you do not yet have real business data, the evaluator uses the mock profile in [`data/business_profile.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/data/business_profile.json). To switch to production data later, replace that file with the real business facts and products. No code changes are required.
+
+### How the seeded evaluation data works
+
+Before any questions are sent, the evaluator writes a temporary business into the configured database, then inserts the matching products and FAQs derived from [`data/business_profile.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/data/business_profile.json). It then runs embedding sync so the backend reply service can retrieve the same facts the judge uses.
+
+This means the questions, the backend retrieval context, and the judge ground truth stay aligned during the same evaluation run.
+
+Important:
+
+- the evaluator and backend must point to the same database for this to work
+- if you want to inspect the seeded records after a run, set `CLEANUP_SEED_DATA=false`
+
+### Run the evaluator
+
+```bash
+python run_eval.py
+```
+
+The runner prints step-by-step logs for:
+
+- temporary business seeding
+- generated query count
+- backend call progress summary
+- scoring summary
+- report output paths
+- cleanup of the seeded business
+
+Artifacts written by the pipeline:
+
+- [`queries/generated_queries.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/queries/generated_queries.json)
+- [`reports/raw_results.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/reports/raw_results.json)
+- [`reports/scored_results.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/reports/scored_results.json)
+- [`reports/report.json`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/reports/report.json)
+- [`reports/report.md`](/Users/zakariaimzilen/Pro/Biz/ZakBot/rag/reports/report.md)
+
+### How scoring works
+
+The judge receives:
+
+- the customer query and metadata
+- the backend response and raw payload
+- the full business profile JSON as ground truth
+
+It scores the reply from 1 to 5 on:
+
+- Relevance
+- Accuracy
+- Language Match
+- Completeness
+- Tone
+- Hallucination Risk
+
+The report includes overall pass rate, language and topic breakdowns, best and worst examples, recurring failure patterns, and concrete recommendations.
+
+Current backend scope for AI replies:
+
+- supported: products, delivery, business profile, contact details, return policy
+- unsupported in-app: order management requests such as status, cancellation, modification, and complaints
+
+For unsupported order-management questions, the backend should hand off clearly to support instead of inventing order procedures.
 
 ## Seed sample data
 

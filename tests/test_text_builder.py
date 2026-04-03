@@ -32,13 +32,18 @@ def test_build_business_profile_text_skips_empty_values() -> None:
             "city": "Rabat",
             "delivery_zones": ["Rabat", "Sale"],
             "payment_methods": ["cash_on_delivery"],
-            "profile_metadata": {},
+            "profile_metadata": {
+                "support_phone": "+212600000000",
+                "opening_hours": ["Mon-Fri 09:00-18:00"],
+            },
         }
     )
 
     assert "Business: Boutique Lina." in text
     assert "City: Rabat." in text
     assert "Delivery zones: Rabat, Sale." in text
+    assert "Support phone: +212600000000." in text
+    assert "Opening hours: Mon-Fri 09:00-18:00." in text
     assert "Description:" not in text
 
 

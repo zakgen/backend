@@ -1,0 +1,313 @@
+[
+  {
+    "id": "en_products_001",
+    "language": "english",
+    "topic": "products",
+    "query_text": "Do you still have Redmi Note 13 8GB/256GB in stock and what is the price?",
+    "expected_intent": "product_price_availability",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "en_products_002",
+    "language": "english",
+    "topic": "products",
+    "query_text": "Which is better for daily use, Anker Soundcore R50i Earbuds or Baseus 20000mAh Power Bank, and how much is each one?",
+    "expected_intent": "product_comparison",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "en_products_003",
+    "language": "english",
+    "topic": "products",
+    "query_text": "Is the JBL Go 3 Speaker back in stock yet?",
+    "expected_intent": "product_availability",
+    "difficulty": "easy",
+    "edge_case_tags": [
+      "out_of_stock_check"
+    ]
+  },
+  {
+    "id": "en_profile_004",
+    "language": "english",
+    "topic": "profile",
+    "query_text": "What time do you open on Saturday and are you closed on Sunday?",
+    "expected_intent": "business_hours",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "en_profile_005",
+    "language": "english",
+    "topic": "profile",
+    "query_text": "Can you send me your exact store address in Casablanca and the best phone number to reach support?",
+    "expected_intent": "business_contact_location",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "en_profile_006",
+    "language": "english",
+    "topic": "profile",
+    "query_text": "If I buy something and change my mind, how many days do I have to return it?",
+    "expected_intent": "return_policy",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "vague"
+    ]
+  },
+  {
+    "id": "en_delivery_007",
+    "language": "english",
+    "topic": "delivery",
+    "query_text": "Do you deliver to Rabat? If yes, how much does it cost and how long does it take?",
+    "expected_intent": "delivery_fee_eta",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "en_delivery_008",
+    "language": "english",
+    "topic": "delivery",
+    "query_text": "I am in Tangier. Do you offer tracking, and when would I probably receive my order?",
+    "expected_intent": "delivery_tracking",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "en_orders_009",
+    "language": "english",
+    "topic": "orders",
+    "query_text": "Hi, I already placed an order. Can I still change the color before it ships?",
+    "expected_intent": "order_handoff",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "polite"
+    ]
+  },
+  {
+    "id": "en_orders_010",
+    "language": "english",
+    "topic": "orders",
+    "query_text": "This is taking too long. How do I cancel my order, and who do I talk to if I want to complain?",
+    "expected_intent": "order_handoff",
+    "difficulty": "hard",
+    "edge_case_tags": [
+      "rude_tone",
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "fr_products_001",
+    "language": "french",
+    "topic": "products",
+    "query_text": "Bonjour, est-ce que vous avez encore le Redmi Note 13 8GB/256GB en stock et à quel prix ?",
+    "expected_intent": "product_price_availability",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "fr_products_002",
+    "language": "french",
+    "topic": "products",
+    "query_text": "Je cherche un bon article dans la catégorie Accessories. Qu'est-ce que vous proposez en ce moment ?",
+    "expected_intent": "product_category_lookup",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "vague"
+    ]
+  },
+  {
+    "id": "fr_products_003",
+    "language": "french",
+    "topic": "products",
+    "query_text": "Vous vendez aussi des iPhone reconditionnés ou seulement les produits affichés chez Atlas Gadget Hub ?",
+    "expected_intent": "product_out_of_scope",
+    "difficulty": "hard",
+    "edge_case_tags": [
+      "out_of_scope"
+    ]
+  },
+  {
+    "id": "fr_profile_004",
+    "language": "french",
+    "topic": "profile",
+    "query_text": "Vous ouvrez à quelle heure du lundi au vendredi ?",
+    "expected_intent": "business_hours",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "fr_profile_005",
+    "language": "french",
+    "topic": "profile",
+    "query_text": "Je veux passer en magasin. Quelle est votre adresse exacte à Casablanca et votre numéro WhatsApp ?",
+    "expected_intent": "business_contact_location",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "fr_profile_006",
+    "language": "french",
+    "topic": "profile",
+    "query_text": "Si le produit ne me convient pas, est-ce que je peux le retourner sous 7 jours ?",
+    "expected_intent": "return_policy",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "polite"
+    ]
+  },
+  {
+    "id": "fr_delivery_007",
+    "language": "french",
+    "topic": "delivery",
+    "query_text": "Vous livrez à Casablanca ? Quels sont les frais et le délai estimé ?",
+    "expected_intent": "delivery_fee_eta",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "fr_delivery_008",
+    "language": "french",
+    "topic": "delivery",
+    "query_text": "Si je commande aujourd'hui pour Tangier, est-ce que je reçois un suivi de livraison ?",
+    "expected_intent": "delivery_tracking",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "fr_orders_009",
+    "language": "french",
+    "topic": "orders",
+    "query_text": "Comment je peux vérifier le statut de ma commande si j'ai déjà mon numéro de commande ?",
+    "expected_intent": "order_handoff",
+    "difficulty": "medium",
+    "edge_case_tags": []
+  },
+  {
+    "id": "fr_orders_010",
+    "language": "french",
+    "topic": "orders",
+    "query_text": "Franchement ce n'est pas sérieux. Je veux annuler ma commande et déposer une réclamation, quelle est la procédure ?",
+    "expected_intent": "order_handoff",
+    "difficulty": "hard",
+    "edge_case_tags": [
+      "rude_tone",
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "da_products_001",
+    "language": "darija",
+    "topic": "products",
+    "query_text": "wach mazal kayn Redmi Note 13 8GB/256GB f stock? w chhal taman dyalo?",
+    "expected_intent": "product_price_availability",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "da_products_002",
+    "language": "darija",
+    "topic": "products",
+    "query_text": "بغيت شي حاجة مزيانة من catégorie Audio, شنو عندكم دابا؟",
+    "expected_intent": "product_category_lookup",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "vague"
+    ]
+  },
+  {
+    "id": "da_products_003",
+    "language": "darija",
+    "topic": "products",
+    "query_text": "هاد JBL Go 3 Speaker باقي مقطوع ولا رجع؟",
+    "expected_intent": "product_availability",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "out_of_stock_check"
+    ]
+  },
+  {
+    "id": "da_profile_004",
+    "language": "darija",
+    "topic": "profile",
+    "query_text": "شنو هي les horaires dyalkom nhar السبت؟ و الأحد مسدودين؟",
+    "expected_intent": "business_hours",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "da_profile_005",
+    "language": "darija",
+    "topic": "profile",
+    "query_text": "فين كاين المحل ديالكم ف Casablanca و شنو numéro li n9dar نتاصل بيه؟",
+    "expected_intent": "business_contact_location",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "da_profile_006",
+    "language": "darija",
+    "topic": "profile",
+    "query_text": "ila chrit produit w ma3jbnich, واش عندي 7 أيام باش نرجعو؟",
+    "expected_intent": "return_policy",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "polite"
+    ]
+  },
+  {
+    "id": "da_delivery_007",
+    "language": "darija",
+    "topic": "delivery",
+    "query_text": "wach kayn delivery l Rabat? chhal frais w ch7al kaywsel?",
+    "expected_intent": "delivery_fee_eta",
+    "difficulty": "easy",
+    "edge_case_tags": []
+  },
+  {
+    "id": "da_delivery_008",
+    "language": "darija",
+    "topic": "delivery",
+    "query_text": "ana f Tangier, ila commandit lyoum واش غادي نتبع colis dyali?",
+    "expected_intent": "delivery_tracking",
+    "difficulty": "medium",
+    "edge_case_tags": [
+      "multi_intent"
+    ]
+  },
+  {
+    "id": "da_orders_009",
+    "language": "darija",
+    "topic": "orders",
+    "query_text": "درت commande من قبل، واش نقدر نبدلها قبل ما تخرج مع livreur؟",
+    "expected_intent": "order_handoff",
+    "difficulty": "medium",
+    "edge_case_tags": []
+  },
+  {
+    "id": "da_orders_010",
+    "language": "darija",
+    "topic": "orders",
+    "query_text": "هادشي طول بزاف. بغيت نلغي commande و نبعث شكاية، ندير شنو؟",
+    "expected_intent": "order_handoff",
+    "difficulty": "hard",
+    "edge_case_tags": [
+      "rude_tone",
+      "multi_intent"
+    ]
+  }
+]

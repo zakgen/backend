@@ -1,0 +1,2876 @@
+[
+  {
+    "query_id": "en_products_001",
+    "query_text": "Do you still have Redmi Note 13 8GB/256GB in stock and what is the price?",
+    "language": "english",
+    "topic": "products",
+    "expected_intent": "product_price_availability",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 10383.12,
+    "ai_response": "Yes, the Redmi Note 13 8GB/256GB is currently in stock at Atlas Gadget Hub. The price is 2899 MAD.",
+    "raw_payload": {
+      "run_id": "130",
+      "business_id": 5,
+      "phone": "+212600000001",
+      "customer_message": "Do you still have Redmi Note 13 8GB/256GB in stock and what is the price?",
+      "reply_text": "Yes, the Redmi Note 13 8GB/256GB is currently in stock at Atlas Gadget Hub. The price is 2899 MAD.",
+      "intent": "disponibilite",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "product_availability_and_price_found",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": "23",
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6847,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 23,
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6847,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:06.433785Z",
+      "updated_at": "2026-04-03T15:24:06.433785Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "disponibilite",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_products_002",
+    "query_text": "Which is better for daily use, Anker Soundcore R50i Earbuds or Baseus 20000mAh Power Bank, and how much is each one?",
+    "language": "english",
+    "topic": "products",
+    "expected_intent": "product_comparison",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 9304.23,
+    "ai_response": "For daily use, the choice depends on your needs: the Anker Soundcore R50i Earbuds are great for wireless audio and clear calls, priced at 349 MAD. The Baseus 20000mAh Power Bank is ideal for fast charging your devices on the go, priced at 499 MAD. Both are in stock at Atlas Gadget Hub.",
+    "raw_payload": {
+      "run_id": "128",
+      "business_id": 5,
+      "phone": "+212600000002",
+      "customer_message": "Which is better for daily use, Anker Soundcore R50i Earbuds or Baseus 20000mAh Power Bank, and how much is each one?",
+      "reply_text": "For daily use, the choice depends on your needs: the Anker Soundcore R50i Earbuds are great for wireless audio and clear calls, priced at 349 MAD. The Baseus 20000mAh Power Bank is ideal for fast charging your devices on the go, priced at 499 MAD. Both are in stock at Atlas Gadget Hub.",
+      "intent": "autre",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "product_comparison_and_price_provided",
+      "follow_up_question": "Do you want more details on either product or help placing an order?",
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": 24,
+          "name": "Anker Soundcore R50i Earbuds",
+          "score": 0.6029,
+          "metadata": {
+            "sku": "ATL-AUD-002",
+            "category": "Audio",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "product",
+          "id": 25,
+          "name": "Baseus 20000mAh Power Bank",
+          "score": 0.4806,
+          "metadata": {
+            "sku": "ATL-ACC-003",
+            "category": "Accessories",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 24,
+          "name": "Anker Soundcore R50i Earbuds",
+          "score": 0.6029,
+          "metadata": {
+            "sku": "ATL-AUD-002",
+            "category": "Audio",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "product",
+          "id": 25,
+          "name": "Baseus 20000mAh Power Bank",
+          "score": 0.4806,
+          "metadata": {
+            "sku": "ATL-ACC-003",
+            "category": "Accessories",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:05.351325Z",
+      "updated_at": "2026-04-03T15:24:05.351325Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "autre",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_products_003",
+    "query_text": "Is the JBL Go 3 Speaker back in stock yet?",
+    "language": "english",
+    "topic": "products",
+    "expected_intent": "product_availability",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 7427.51,
+    "ai_response": "The JBL Go 3 Speaker is currently out of stock at Atlas Gadget Hub. You can contact us on WhatsApp +212661234567 or phone +212522450980 for updates.",
+    "raw_payload": {
+      "run_id": "126",
+      "business_id": 5,
+      "phone": "+212600000003",
+      "customer_message": "Is the JBL Go 3 Speaker back in stock yet?",
+      "reply_text": "The JBL Go 3 Speaker is currently out of stock at Atlas Gadget Hub. You can contact us on WhatsApp +212661234567 or phone +212522450980 for updates.",
+      "intent": "disponibilite",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "product_out_of_stock",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": "27",
+          "name": "JBL Go 3 Speaker",
+          "score": 0.6868,
+          "metadata": {
+            "sku": "ATL-SPK-005",
+            "category": "Audio",
+            "availability": "out_of_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 27,
+          "name": "JBL Go 3 Speaker",
+          "score": 0.6868,
+          "metadata": {
+            "sku": "ATL-SPK-005",
+            "category": "Audio",
+            "availability": "out_of_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:03.398895Z",
+      "updated_at": "2026-04-03T15:24:03.398895Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "disponibilite",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_profile_004",
+    "query_text": "What time do you open on Saturday and are you closed on Sunday?",
+    "language": "english",
+    "topic": "profile",
+    "expected_intent": "business_hours",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 2830.16,
+    "ai_response": "We are open Saturday: 10:00-17:00, Sunday: Closed.",
+    "raw_payload": {
+      "run_id": "123",
+      "business_id": 5,
+      "phone": "+212600000004",
+      "customer_message": "What time do you open on Saturday and are you closed on Sunday?",
+      "reply_text": "We are open Saturday: 10:00-17:00, Sunday: Closed.",
+      "intent": "infos_boutique",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_opening_hours",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "opening_hours",
+          "name": "Opening Hours",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "opening_hours"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "opening_hours",
+          "name": "Opening Hours",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "opening_hours"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:23:58.851640Z",
+      "updated_at": "2026-04-03T15:23:58.851640Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_profile_005",
+    "query_text": "Can you send me your exact store address in Casablanca and the best phone number to reach support?",
+    "language": "english",
+    "topic": "profile",
+    "expected_intent": "business_contact_location",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 2815.06,
+    "ai_response": "Our store address is 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+    "raw_payload": {
+      "run_id": "122",
+      "business_id": 5,
+      "phone": "+212600000005",
+      "customer_message": "Can you send me your exact store address in Casablanca and the best phone number to reach support?",
+      "reply_text": "Our store address is 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+      "intent": "infos_boutique",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_contact",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:23:58.842933Z",
+      "updated_at": "2026-04-03T15:23:58.842933Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_profile_006",
+    "query_text": "If I buy something and change my mind, how many days do I have to return it?",
+    "language": "english",
+    "topic": "profile",
+    "expected_intent": "return_policy",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 5332.61,
+    "ai_response": "You can return an item within 7 days. Product must be unused and returned with original packaging. Opened audio accessories can only be returned if defective. Refunds are processed within 5 business days after inspection.",
+    "raw_payload": {
+      "run_id": "124",
+      "business_id": 5,
+      "phone": "+212600000006",
+      "customer_message": "If I buy something and change my mind, how many days do I have to return it?",
+      "reply_text": "You can return an item within 7 days. Product must be unused and returned with original packaging. Opened audio accessories can only be returned if defective. Refunds are processed within 5 business days after inspection.",
+      "intent": "retour",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_return_policy",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "return_window_days",
+          "name": "Return Window Days",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_window_days"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_conditions",
+          "name": "Return Conditions",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_conditions"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_policy",
+          "name": "Return Policy",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_policy"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "return_window_days",
+          "name": "Return Window Days",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_window_days"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_conditions",
+          "name": "Return Conditions",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_conditions"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_policy",
+          "name": "Return Policy",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_policy"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:01.221720Z",
+      "updated_at": "2026-04-03T15:24:01.221720Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "retour",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_delivery_007",
+    "query_text": "Do you deliver to Rabat? If yes, how much does it cost and how long does it take?",
+    "language": "english",
+    "topic": "delivery",
+    "expected_intent": "delivery_fee_eta",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 9300.57,
+    "ai_response": "Yes, we deliver to Rabat for 35 MAD. The delivery takes about 24 to 48 hours.",
+    "raw_payload": {
+      "run_id": "129",
+      "business_id": 5,
+      "phone": "+212600000007",
+      "customer_message": "Do you deliver to Rabat? If yes, how much does it cost and how long does it take?",
+      "reply_text": "Yes, we deliver to Rabat for 35 MAD. The delivery takes about 24 to 48 hours.",
+      "intent": "livraison",
+      "language": "english",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.95,
+      "reason_code": "direct_answer_from_faq",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "faq",
+          "id": "31",
+          "name": "Do you deliver to Rabat?",
+          "score": 0.812,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Rabat",
+            "confidence_label": "medium"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "faq",
+          "id": 31,
+          "name": "Do you deliver to Rabat?",
+          "score": 0.812,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Rabat",
+            "confidence_label": "medium"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 32,
+          "name": "Do you deliver to Marrakech?",
+          "score": 0.7173,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Marrakech",
+            "confidence_label": "medium"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 34,
+          "name": "Do you deliver to Agadir?",
+          "score": 0.6783,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Agadir",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 30,
+          "name": "Do you deliver to Casablanca?",
+          "score": 0.6717,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Casablanca",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 33,
+          "name": "Do you deliver to Tangier?",
+          "score": 0.6327,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Tangier",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 37,
+          "name": "What is your store address and support contact?",
+          "score": 0.4536,
+          "metadata": {
+            "topic": "profile",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:05.351454Z",
+      "updated_at": "2026-04-03T15:24:05.351454Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "livraison",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "en_delivery_008",
+    "query_text": "I am in Tangier. Do you offer tracking, and when would I probably receive my order?",
+    "language": "english",
+    "topic": "delivery",
+    "expected_intent": "delivery_tracking",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 6960.24,
+    "ai_response": "Order management is handled by our support team, not directly in this chat. Please contact support for order status, changes, cancellations, or complaints. Support contacts: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "125",
+      "business_id": 5,
+      "phone": "+212600000008",
+      "customer_message": "I am in Tangier. Do you offer tracking, and when would I probably receive my order?",
+      "reply_text": "Order management is handled by our support team, not directly in this chat. Please contact support for order status, changes, cancellations, or complaints. Support contacts: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "english",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:02.901353Z",
+      "updated_at": "2026-04-03T15:24:02.901353Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "en_orders_009",
+    "query_text": "Hi, I already placed an order. Can I still change the color before it ships?",
+    "language": "english",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 12784.92,
+    "ai_response": "To change the color of your order before it ships, please contact our support team as soon as possible. You can reach them via WhatsApp at +212661234567 or by phone at +212522450980 during our business hours (Monday to Friday: 09:00-19:00, Saturday: 10:00-17:00).",
+    "raw_payload": {
+      "run_id": "133",
+      "business_id": 5,
+      "phone": "+212600000009",
+      "customer_message": "Hi, I already placed an order. Can I still change the color before it ships?",
+      "reply_text": "To change the color of your order before it ships, please contact our support team as soon as possible. You can reach them via WhatsApp at +212661234567 or by phone at +212522450980 during our business hours (Monday to Friday: 09:00-19:00, Saturday: 10:00-17:00).",
+      "intent": "livraison",
+      "language": "english",
+      "grounded": false,
+      "needs_human": true,
+      "confidence": 0.8,
+      "reason_code": "no_direct_info_order_change",
+      "follow_up_question": "Can you please provide your order number so we can assist you better?",
+      "decision": "needs_human",
+      "used_sources": [],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "delivery_zones",
+          "name": "Delivery Zones",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_zones"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "delivery_zone_details",
+          "name": "Delivery Zone Details",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_zone_details"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "delivery_time",
+          "name": "Delivery Time",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_time"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "delivery_tracking_method",
+          "name": "Delivery Tracking Method",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_tracking_method"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "shipping_policy",
+          "name": "Shipping Policy",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "shipping_policy"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "payment_methods",
+          "name": "Payment Methods",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "payment_methods"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:08.836827Z",
+      "updated_at": "2026-04-03T15:24:08.836827Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "livraison",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "en_orders_010",
+    "query_text": "This is taking too long. How do I cancel my order, and who do I talk to if I want to complain?",
+    "language": "english",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 8689.08,
+    "ai_response": "Order management is handled by our support team, not directly in this chat. Please contact support for order status, changes, cancellations, or complaints. Support contacts: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "127",
+      "business_id": 5,
+      "phone": "+212600000010",
+      "customer_message": "This is taking too long. How do I cancel my order, and who do I talk to if I want to complain?",
+      "reply_text": "Order management is handled by our support team, not directly in this chat. Please contact support for order status, changes, cancellations, or complaints. Support contacts: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "english",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:04.737738Z",
+      "updated_at": "2026-04-03T15:24:04.737738Z"
+    },
+    "error": null,
+    "service_language": "english",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "fr_products_001",
+    "query_text": "Bonjour, est-ce que vous avez encore le Redmi Note 13 8GB/256GB en stock et à quel prix ?",
+    "language": "french",
+    "topic": "products",
+    "expected_intent": "product_price_availability",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 15014.69,
+    "ai_response": "Bonjour, le Redmi Note 13 8GB/256GB est en stock chez Atlas Gadget Hub au prix de 2899 MAD.",
+    "raw_payload": {
+      "run_id": "136",
+      "business_id": 5,
+      "phone": "+212600000001",
+      "customer_message": "Bonjour, est-ce que vous avez encore le Redmi Note 13 8GB/256GB en stock et à quel prix ?",
+      "reply_text": "Bonjour, le Redmi Note 13 8GB/256GB est en stock chez Atlas Gadget Hub au prix de 2899 MAD.",
+      "intent": "disponibilite",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.85,
+      "reason_code": "product_in_stock_and_price_known",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": "23",
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6368,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 23,
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6368,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:11.065921Z",
+      "updated_at": "2026-04-03T15:24:11.065921Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "disponibilite",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_products_002",
+    "query_text": "Je cherche un bon article dans la catégorie Accessories. Qu'est-ce que vous proposez en ce moment ?",
+    "language": "french",
+    "topic": "products",
+    "expected_intent": "product_category_lookup",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 15420.38,
+    "ai_response": "Chez Atlas Gadget Hub, nous proposons une large gamme d'accessoires mobiles, audio et gadgets pour la maison connectée, tous à des prix abordables. Vous pouvez trouver des accessoires pour smartphones, des équipements audio et des gadgets intelligents pour la maison. Pour plus de détails ou recommandations personnalisées, n'hésitez pas à nous contacter sur WhatsApp au +212661234567.",
+    "raw_payload": {
+      "run_id": "137",
+      "business_id": 5,
+      "phone": "+212600000002",
+      "customer_message": "Je cherche un bon article dans la catégorie Accessories. Qu'est-ce que vous proposez en ce moment ?",
+      "reply_text": "Chez Atlas Gadget Hub, nous proposons une large gamme d'accessoires mobiles, audio et gadgets pour la maison connectée, tous à des prix abordables. Vous pouvez trouver des accessoires pour smartphones, des équipements audio et des gadgets intelligents pour la maison. Pour plus de détails ou recommandations personnalisées, n'hésitez pas à nous contacter sur WhatsApp au +212661234567.",
+      "intent": "autre",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "info_produit_general",
+      "follow_up_question": "Quel type d'accessoires recherchez-vous précisément ?",
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:11.469914Z",
+      "updated_at": "2026-04-03T15:24:11.469914Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "autre",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_products_003",
+    "query_text": "Vous vendez aussi des iPhone reconditionnés ou seulement les produits affichés chez Atlas Gadget Hub ?",
+    "language": "french",
+    "topic": "products",
+    "expected_intent": "product_out_of_scope",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 11050.76,
+    "ai_response": "Notre adresse est 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+    "raw_payload": {
+      "run_id": "131",
+      "business_id": 5,
+      "phone": "+212600000003",
+      "customer_message": "Vous vendez aussi des iPhone reconditionnés ou seulement les produits affichés chez Atlas Gadget Hub ?",
+      "reply_text": "Notre adresse est 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+      "intent": "infos_boutique",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_contact",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:07.103415Z",
+      "updated_at": "2026-04-03T15:24:07.103415Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_profile_004",
+    "query_text": "Vous ouvrez à quelle heure du lundi au vendredi ?",
+    "language": "french",
+    "topic": "profile",
+    "expected_intent": "business_hours",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 15423.82,
+    "ai_response": "Nous sommes ouverts du lundi au vendredi de 09h00 à 19h00. Vous pouvez nous rendre visite à cette heure-là !",
+    "raw_payload": {
+      "run_id": "138",
+      "business_id": 5,
+      "phone": "+212600000004",
+      "customer_message": "Vous ouvrez à quelle heure du lundi au vendredi ?",
+      "reply_text": "Nous sommes ouverts du lundi au vendredi de 09h00 à 19h00. Vous pouvez nous rendre visite à cette heure-là !",
+      "intent": "autre",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 1.0,
+      "reason_code": "opening_hours_provided",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:11.470913Z",
+      "updated_at": "2026-04-03T15:24:11.470913Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "autre",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_profile_005",
+    "query_text": "Je veux passer en magasin. Quelle est votre adresse exacte à Casablanca et votre numéro WhatsApp ?",
+    "language": "french",
+    "topic": "profile",
+    "expected_intent": "business_contact_location",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 12367.69,
+    "ai_response": "Notre adresse est 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980; WhatsApp: +212661234567",
+    "raw_payload": {
+      "run_id": "132",
+      "business_id": 5,
+      "phone": "+212600000005",
+      "customer_message": "Je veux passer en magasin. Quelle est votre adresse exacte à Casablanca et votre numéro WhatsApp ?",
+      "reply_text": "Notre adresse est 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980; WhatsApp: +212661234567",
+      "intent": "infos_boutique",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_contact",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:08.419395Z",
+      "updated_at": "2026-04-03T15:24:08.419395Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_profile_006",
+    "query_text": "Si le produit ne me convient pas, est-ce que je peux le retourner sous 7 jours ?",
+    "language": "french",
+    "topic": "profile",
+    "expected_intent": "return_policy",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 14133.77,
+    "ai_response": "Vous pouvez retourner un produit sous 7 jours. Product must be unused and returned with original packaging. Opened audio accessories can only be returned if defective. Refunds are processed within 5 business days after inspection.",
+    "raw_payload": {
+      "run_id": "134",
+      "business_id": 5,
+      "phone": "+212600000006",
+      "customer_message": "Si le produit ne me convient pas, est-ce que je peux le retourner sous 7 jours ?",
+      "reply_text": "Vous pouvez retourner un produit sous 7 jours. Product must be unused and returned with original packaging. Opened audio accessories can only be returned if defective. Refunds are processed within 5 business days after inspection.",
+      "intent": "retour",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_return_policy",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "return_window_days",
+          "name": "Return Window Days",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_window_days"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_conditions",
+          "name": "Return Conditions",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_conditions"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_policy",
+          "name": "Return Policy",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_policy"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "return_window_days",
+          "name": "Return Window Days",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_window_days"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_conditions",
+          "name": "Return Conditions",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_conditions"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "return_policy",
+          "name": "Return Policy",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "return_policy"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:10.180780Z",
+      "updated_at": "2026-04-03T15:24:10.180780Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "retour",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_delivery_007",
+    "query_text": "Vous livrez à Casablanca ? Quels sont les frais et le délai estimé ?",
+    "language": "french",
+    "topic": "delivery",
+    "expected_intent": "delivery_fee_eta",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 14381.73,
+    "ai_response": "Oui, nous livrons à Casablanca pour 20 MAD, avec un délai estimé de Same day or next day.",
+    "raw_payload": {
+      "run_id": "135",
+      "business_id": 5,
+      "phone": "+212600000007",
+      "customer_message": "Vous livrez à Casablanca ? Quels sont les frais et le délai estimé ?",
+      "reply_text": "Oui, nous livrons à Casablanca pour 20 MAD, avec un délai estimé de Same day or next day.",
+      "intent": "livraison",
+      "language": "french",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_delivery",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "delivery_zone_details",
+          "name": "Delivery Zone Details",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_zone_details"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "delivery_tracking_method",
+          "name": "Delivery Tracking Method",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_tracking_method"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "delivery_zone_details",
+          "name": "Delivery Zone Details",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_zone_details"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "delivery_tracking_method",
+          "name": "Delivery Tracking Method",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "delivery_tracking_method"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:10.432399Z",
+      "updated_at": "2026-04-03T15:24:10.432399Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "livraison",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "fr_delivery_008",
+    "query_text": "Si je commande aujourd'hui pour Tangier, est-ce que je reçois un suivi de livraison ?",
+    "language": "french",
+    "topic": "delivery",
+    "expected_intent": "delivery_tracking",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 15477.34,
+    "ai_response": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "139",
+      "business_id": 5,
+      "phone": "+212600000008",
+      "customer_message": "Si je commande aujourd'hui pour Tangier, est-ce que je reçois un suivi de livraison ?",
+      "reply_text": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "french",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:11.529186Z",
+      "updated_at": "2026-04-03T15:24:11.529186Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "fr_orders_009",
+    "query_text": "Comment je peux vérifier le statut de ma commande si j'ai déjà mon numéro de commande ?",
+    "language": "french",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 15479.05,
+    "ai_response": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "140",
+      "business_id": 5,
+      "phone": "+212600000009",
+      "customer_message": "Comment je peux vérifier le statut de ma commande si j'ai déjà mon numéro de commande ?",
+      "reply_text": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "french",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:11.531563Z",
+      "updated_at": "2026-04-03T15:24:11.531563Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "fr_orders_010",
+    "query_text": "Franchement ce n'est pas sérieux. Je veux annuler ma commande et déposer une réclamation, quelle est la procédure ?",
+    "language": "french",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 16090.28,
+    "ai_response": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "141",
+      "business_id": 5,
+      "phone": "+212600000010",
+      "customer_message": "Franchement ce n'est pas sérieux. Je veux annuler ma commande et déposer une réclamation, quelle est la procédure ?",
+      "reply_text": "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. Contacts support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "french",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:12.140293Z",
+      "updated_at": "2026-04-03T15:24:12.140293Z"
+    },
+    "error": null,
+    "service_language": "french",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "da_products_001",
+    "query_text": "wach mazal kayn Redmi Note 13 8GB/256GB f stock? w chhal taman dyalo?",
+    "language": "darija",
+    "topic": "products",
+    "expected_intent": "product_price_availability",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 21344.08,
+    "ai_response": "Aji, Redmi Note 13 8GB/256GB mazal kayn f stock 3andna, taman dyalo howa 2899 MAD.",
+    "raw_payload": {
+      "run_id": "145",
+      "business_id": 5,
+      "phone": "+212600000001",
+      "customer_message": "wach mazal kayn Redmi Note 13 8GB/256GB f stock? w chhal taman dyalo?",
+      "reply_text": "Aji, Redmi Note 13 8GB/256GB mazal kayn f stock 3andna, taman dyalo howa 2899 MAD.",
+      "intent": "disponibilite",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "product_availability_and_price_found",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": "23",
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6339,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 23,
+          "name": "Redmi Note 13 8GB/256GB",
+          "score": 0.6339,
+          "metadata": {
+            "sku": "ATL-PHN-001",
+            "category": "Smartphones",
+            "availability": "in_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:17.392194Z",
+      "updated_at": "2026-04-03T15:24:17.392194Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "disponibilite",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_products_002",
+    "query_text": "بغيت شي حاجة مزيانة من catégorie Audio, شنو عندكم دابا؟",
+    "language": "darija",
+    "topic": "products",
+    "expected_intent": "product_category_lookup",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 20931.27,
+    "ai_response": "عندنا مجموعة مزيانة من أجهزة الصوت بحال سماعات، مكبرات صوت، وملحقات صوتية أخرى. واش كتفضل شي نوع معين أو ماركة؟",
+    "raw_payload": {
+      "run_id": "144",
+      "business_id": 5,
+      "phone": "+212600000002",
+      "customer_message": "بغيت شي حاجة مزيانة من catégorie Audio, شنو عندكم دابا؟",
+      "reply_text": "عندنا مجموعة مزيانة من أجهزة الصوت بحال سماعات، مكبرات صوت، وملحقات صوتية أخرى. واش كتفضل شي نوع معين أو ماركة؟",
+      "intent": "autre",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "product_category_available",
+      "follow_up_question": "كتفضل شي نوع معين أو ماركة من أجهزة الصوت؟",
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:16.982827Z",
+      "updated_at": "2026-04-03T15:24:16.982827Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "autre",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_products_003",
+    "query_text": "هاد JBL Go 3 Speaker باقي مقطوع ولا رجع؟",
+    "language": "darija",
+    "topic": "products",
+    "expected_intent": "product_availability",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 22999.94,
+    "ai_response": "حاليًا، سماعة JBL Go 3 غير متوفرة عندنا في المخزون.",
+    "raw_payload": {
+      "run_id": "147",
+      "business_id": 5,
+      "phone": "+212600000003",
+      "customer_message": "هاد JBL Go 3 Speaker باقي مقطوع ولا رجع؟",
+      "reply_text": "حاليًا، سماعة JBL Go 3 غير متوفرة عندنا في المخزون.",
+      "intent": "disponibilite",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.8,
+      "reason_code": "product_out_of_stock",
+      "follow_up_question": "بغيت نعلمك منين توصل ولا كاين شي موديل آخر مهتم بيه؟",
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "product",
+          "id": "27",
+          "name": "JBL Go 3 Speaker",
+          "score": 0.6163,
+          "metadata": {
+            "sku": "ATL-SPK-005",
+            "category": "Audio",
+            "availability": "out_of_stock",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "product",
+          "id": 27,
+          "name": "JBL Go 3 Speaker",
+          "score": 0.6163,
+          "metadata": {
+            "sku": "ATL-SPK-005",
+            "category": "Audio",
+            "availability": "out_of_stock",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:19.043677Z",
+      "updated_at": "2026-04-03T15:24:19.043677Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "disponibilite",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_profile_004",
+    "query_text": "شنو هي les horaires dyalkom nhar السبت؟ و الأحد مسدودين؟",
+    "language": "darija",
+    "topic": "profile",
+    "expected_intent": "business_hours",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 16668.97,
+    "ai_response": "Les horaires dyalna houma: Saturday: 10:00-17:00, Sunday: Closed.",
+    "raw_payload": {
+      "run_id": "142",
+      "business_id": 5,
+      "phone": "+212600000004",
+      "customer_message": "شنو هي les horaires dyalkom nhar السبت؟ و الأحد مسدودين؟",
+      "reply_text": "Les horaires dyalna houma: Saturday: 10:00-17:00, Sunday: Closed.",
+      "intent": "infos_boutique",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_opening_hours",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "opening_hours",
+          "name": "Opening Hours",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "opening_hours"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "opening_hours",
+          "name": "Opening Hours",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "opening_hours"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:12.721224Z",
+      "updated_at": "2026-04-03T15:24:12.721224Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_profile_005",
+    "query_text": "فين كاين المحل ديالكم ف Casablanca و شنو numéro li n9dar نتاصل بيه؟",
+    "language": "darija",
+    "topic": "profile",
+    "expected_intent": "business_contact_location",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 17303.75,
+    "ai_response": "L'adresse dyalna hiya 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+    "raw_payload": {
+      "run_id": "143",
+      "business_id": 5,
+      "phone": "+212600000005",
+      "customer_message": "فين كاين المحل ديالكم ف Casablanca و شنو numéro li n9dar نتاصل بيه؟",
+      "reply_text": "L'adresse dyalna hiya 27 Rue Al Massira, Maarif, Casablanca, Morocco. Phone: +212522450980",
+      "intent": "infos_boutique",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.99,
+      "reason_code": "rule_based_contact",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "store_address",
+          "name": "Store Address",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "store_address"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:13.355670Z",
+      "updated_at": "2026-04-03T15:24:13.355670Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "infos_boutique",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_profile_006",
+    "query_text": "ila chrit produit w ma3jbnich, واش عندي 7 أيام باش نرجعو؟",
+    "language": "darija",
+    "topic": "profile",
+    "expected_intent": "return_policy",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 21914.34,
+    "ai_response": "سلام، بالنسبة لسياسة الإرجاع عندنا، ما عنديش معلومات دقيقة على مدة 7 أيام للإرجاع. باش نعاونك مزيان، من الأفضل تتواصل مع الدعم ديالنا عبر WhatsApp +212661234567 أو الإيميل support@atlasgadgethub.ma.",
+    "raw_payload": {
+      "run_id": "146",
+      "business_id": 5,
+      "phone": "+212600000006",
+      "customer_message": "ila chrit produit w ma3jbnich, واش عندي 7 أيام باش نرجعو؟",
+      "reply_text": "سلام، بالنسبة لسياسة الإرجاع عندنا، ما عنديش معلومات دقيقة على مدة 7 أيام للإرجاع. باش نعاونك مزيان، من الأفضل تتواصل مع الدعم ديالنا عبر WhatsApp +212661234567 أو الإيميل support@atlasgadgethub.ma.",
+      "intent": "retour",
+      "language": "darija",
+      "grounded": false,
+      "needs_human": true,
+      "confidence": 0.7,
+      "reason_code": "no_return_policy_info",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:17.966850Z",
+      "updated_at": "2026-04-03T15:24:17.966850Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "retour",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "da_delivery_007",
+    "query_text": "wach kayn delivery l Rabat? chhal frais w ch7al kaywsel?",
+    "language": "darija",
+    "topic": "delivery",
+    "expected_intent": "delivery_fee_eta",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 23682.49,
+    "ai_response": "Ahlen! Kayn delivery l Rabat b 35 MAD, w kaywsel f 24 7tta l 48 sa3a. Ila bghiti t3rf akthar, ana hna.",
+    "raw_payload": {
+      "run_id": "150",
+      "business_id": 5,
+      "phone": "+212600000007",
+      "customer_message": "wach kayn delivery l Rabat? chhal frais w ch7al kaywsel?",
+      "reply_text": "Ahlen! Kayn delivery l Rabat b 35 MAD, w kaywsel f 24 7tta l 48 sa3a. Ila bghiti t3rf akthar, ana hna.",
+      "intent": "prix",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.9,
+      "reason_code": "delivery_fee_and_time_provided",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "faq",
+          "id": "31",
+          "name": "Do you deliver to Rabat?",
+          "score": 0.544,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Rabat",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_knowledge",
+          "id": "5",
+          "name": "Atlas Gadget Hub",
+          "score": 0.457,
+          "metadata": {
+            "city": "Casablanca",
+            "delivery_zones": [
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Tangier",
+              "Agadir"
+            ],
+            "payment_methods": [
+              "cash_on_delivery",
+              "card_payment"
+            ],
+            "source_type": "profile",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "faq",
+          "id": 31,
+          "name": "Do you deliver to Rabat?",
+          "score": 0.544,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Rabat",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 32,
+          "name": "Do you deliver to Marrakech?",
+          "score": 0.4633,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Marrakech",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 30,
+          "name": "Do you deliver to Casablanca?",
+          "score": 0.4517,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Casablanca",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 34,
+          "name": "Do you deliver to Agadir?",
+          "score": 0.4503,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Agadir",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_knowledge",
+          "id": 5,
+          "name": "Atlas Gadget Hub",
+          "score": 0.457,
+          "metadata": {
+            "city": "Casablanca",
+            "delivery_zones": [
+              "Casablanca",
+              "Rabat",
+              "Marrakech",
+              "Tangier",
+              "Agadir"
+            ],
+            "payment_methods": [
+              "cash_on_delivery",
+              "card_payment"
+            ],
+            "source_type": "profile",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:19.733287Z",
+      "updated_at": "2026-04-03T15:24:19.733287Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "prix",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_delivery_008",
+    "query_text": "ana f Tangier, ila commandit lyoum واش غادي نتبع colis dyali?",
+    "language": "darija",
+    "topic": "delivery",
+    "expected_intent": "delivery_tracking",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 31531.58,
+    "ai_response": "نعم، كنوصّلو حتى طنجة بثمن 45 درهم، والمدة المتوقعة للتوصيل هي بين 48 و72 ساعة بعد تأكيد الطلب.",
+    "raw_payload": {
+      "run_id": "151",
+      "business_id": 5,
+      "phone": "+212600000008",
+      "customer_message": "ana f Tangier, ila commandit lyoum واش غادي نتبع colis dyali?",
+      "reply_text": "نعم، كنوصّلو حتى طنجة بثمن 45 درهم، والمدة المتوقعة للتوصيل هي بين 48 و72 ساعة بعد تأكيد الطلب.",
+      "intent": "livraison",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": false,
+      "confidence": 0.8,
+      "reason_code": "delivery_info_available",
+      "follow_up_question": null,
+      "decision": "send",
+      "used_sources": [
+        {
+          "type": "faq",
+          "id": "33",
+          "name": "Do you deliver to Tangier?",
+          "score": 0.5803,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Tangier",
+            "confidence_label": "low"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "faq",
+          "id": 33,
+          "name": "Do you deliver to Tangier?",
+          "score": 0.5803,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Tangier",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "faq",
+          "id": 34,
+          "name": "Do you deliver to Agadir?",
+          "score": 0.4683,
+          "metadata": {
+            "topic": "delivery",
+            "city": "Agadir",
+            "confidence_label": "low"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "summary",
+          "name": "Summary",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "summary"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "niche",
+          "name": "Niche",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "niche"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:27.580511Z",
+      "updated_at": "2026-04-03T15:24:27.580511Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "livraison",
+    "service_decision": "send"
+  },
+  {
+    "query_id": "da_orders_009",
+    "query_text": "درت commande من قبل، واش نقدر نبدلها قبل ما تخرج مع livreur؟",
+    "language": "darija",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 23013.33,
+    "ai_response": "Tadبير dyal les commandes kaydirouh support, machi مباشرة من هاد الشات. Ila bghiti suivi, modification, annulation, ولا شكاية، تواصل m3a support. Contacts dyal support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "148",
+      "business_id": 5,
+      "phone": "+212600000009",
+      "customer_message": "درت commande من قبل، واش نقدر نبدلها قبل ما تخرج مع livreur؟",
+      "reply_text": "Tadبير dyal les commandes kaydirouh support, machi مباشرة من هاد الشات. Ila bghiti suivi, modification, annulation, ولا شكاية، تواصل m3a support. Contacts dyal support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:19.065080Z",
+      "updated_at": "2026-04-03T15:24:19.065080Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  },
+  {
+    "query_id": "da_orders_010",
+    "query_text": "هادشي طول بزاف. بغيت نلغي commande و نبعث شكاية، ندير شنو؟",
+    "language": "darija",
+    "topic": "orders",
+    "expected_intent": "order_handoff",
+    "status": "success",
+    "http_status": 200,
+    "latency_ms": 23318.21,
+    "ai_response": "Tadبير dyal les commandes kaydirouh support, machi مباشرة من هاد الشات. Ila bghiti suivi, modification, annulation, ولا شكاية، تواصل m3a support. Contacts dyal support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+    "raw_payload": {
+      "run_id": "149",
+      "business_id": 5,
+      "phone": "+212600000010",
+      "customer_message": "هادشي طول بزاف. بغيت نلغي commande و نبعث شكاية، ندير شنو؟",
+      "reply_text": "Tadبير dyal les commandes kaydirouh support, machi مباشرة من هاد الشات. Ila bghiti suivi, modification, annulation, ولا شكاية، تواصل m3a support. Contacts dyal support: WhatsApp: +212661234567; Phone: +212522450980; Email: support@atlasgadgethub.ma",
+      "intent": "autre",
+      "language": "darija",
+      "grounded": true,
+      "needs_human": true,
+      "confidence": 0.98,
+      "reason_code": "order_handoff",
+      "follow_up_question": null,
+      "decision": "needs_human",
+      "used_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "retrieved_sources": [
+        {
+          "type": "business_fact",
+          "id": "whatsapp_number",
+          "name": "Whatsapp Number",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "whatsapp_number"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_phone",
+          "name": "Support Phone",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_phone"
+          }
+        },
+        {
+          "type": "business_fact",
+          "id": "support_email",
+          "name": "Support Email",
+          "score": 1.0,
+          "metadata": {
+            "source_type": "business_profile",
+            "fact_key": "support_email"
+          }
+        }
+      ],
+      "sent": false,
+      "outbound_message": null,
+      "created_at": "2026-04-03T15:24:19.368995Z",
+      "updated_at": "2026-04-03T15:24:19.368995Z"
+    },
+    "error": null,
+    "service_language": "darija",
+    "service_intent": "autre",
+    "service_decision": "needs_human"
+  }
+]

@@ -55,10 +55,18 @@ class BusinessProfile(BaseModel):
     supported_languages: list[str] = Field(default_factory=list)
     tone_of_voice: ToneOfVoice
     opening_hours: list[str] = Field(default_factory=list)
+    store_address: str | None = None
+    support_phone: str | None = None
+    whatsapp_number: str | None = None
+    support_email: str | None = None
     delivery_zones: list[str] = Field(default_factory=list)
     delivery_time: str
+    delivery_tracking_method: str | None = None
+    delivery_zone_details: list[dict[str, Any]] = Field(default_factory=list)
     shipping_policy: str
     return_policy: str
+    return_window_days: int | None = None
+    return_conditions: list[str] = Field(default_factory=list)
     payment_methods: list[PaymentMethod] = Field(default_factory=list)
     faq: list[BusinessFAQItem] = Field(default_factory=list)
     order_rules: list[str] = Field(default_factory=list)
@@ -77,10 +85,18 @@ class BusinessProfileUpdateRequest(BaseModel):
     supported_languages: list[str] | None = None
     tone_of_voice: ToneOfVoice | None = None
     opening_hours: list[str] | None = None
+    store_address: str | None = None
+    support_phone: str | None = None
+    whatsapp_number: str | None = None
+    support_email: str | None = None
     delivery_zones: list[str] | None = None
     delivery_time: str | None = None
+    delivery_tracking_method: str | None = None
+    delivery_zone_details: list[dict[str, Any]] | None = None
     shipping_policy: str | None = None
     return_policy: str | None = None
+    return_window_days: int | None = None
+    return_conditions: list[str] | None = None
     payment_methods: list[PaymentMethod] | None = None
     faq: list[BusinessFAQUpdateItem] | None = None
     order_rules: list[str] | None = None

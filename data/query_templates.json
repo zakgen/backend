@@ -1,0 +1,259 @@
+{
+  "english": [
+    {
+      "topic": "products",
+      "expected_intent": "product_price_availability",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "Do you still have {available_product_1} in stock and what is the price?"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_comparison",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "Which is better for daily use, {available_product_2} or {available_product_3}, and how much is each one?"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_availability",
+      "difficulty": "easy",
+      "edge_case_tags": [
+        "out_of_stock_check"
+      ],
+      "query_text": "Is the {unavailable_product_1} back in stock yet?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_hours",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "What time do you open on Saturday and are you closed on Sunday?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_contact_location",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "Can you send me your exact store address in {city} and the best phone number to reach support?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "return_policy",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "vague"
+      ],
+      "query_text": "If I buy something and change my mind, how many days do I have to return it?"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_fee_eta",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "Do you deliver to {delivery_zone_2}? If yes, how much does it cost and how long does it take?"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_tracking",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "I am in {delivery_zone_3}. Do you offer tracking, and when would I probably receive my order?"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "polite"
+      ],
+      "query_text": "Hi, I already placed an order. Can I still change the color before it ships?"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "hard",
+      "edge_case_tags": [
+        "rude_tone",
+        "multi_intent"
+      ],
+      "query_text": "This is taking too long. How do I cancel my order, and who do I talk to if I want to complain?"
+    }
+  ],
+  "french": [
+    {
+      "topic": "products",
+      "expected_intent": "product_price_availability",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "Bonjour, est-ce que vous avez encore le {available_product_1} en stock et à quel prix ?"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_category_lookup",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "vague"
+      ],
+      "query_text": "Je cherche un bon article dans la catégorie {category_1}. Qu'est-ce que vous proposez en ce moment ?"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_out_of_scope",
+      "difficulty": "hard",
+      "edge_case_tags": [
+        "out_of_scope"
+      ],
+      "query_text": "Vous vendez aussi des iPhone reconditionnés ou seulement les produits affichés chez {business_name} ?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_hours",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "Vous ouvrez à quelle heure du lundi au vendredi ?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_contact_location",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "Je veux passer en magasin. Quelle est votre adresse exacte à {city} et votre numéro WhatsApp ?"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "return_policy",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "polite"
+      ],
+      "query_text": "Si le produit ne me convient pas, est-ce que je peux le retourner sous {return_days} jours ?"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_fee_eta",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "Vous livrez à {delivery_zone_1} ? Quels sont les frais et le délai estimé ?"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_tracking",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "Si je commande aujourd'hui pour {delivery_zone_3}, est-ce que je reçois un suivi de livraison ?"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "medium",
+      "edge_case_tags": [],
+      "query_text": "Comment je peux vérifier le statut de ma commande si j'ai déjà mon numéro de commande ?"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "hard",
+      "edge_case_tags": [
+        "rude_tone",
+        "multi_intent"
+      ],
+      "query_text": "Franchement ce n'est pas sérieux. Je veux annuler ma commande et déposer une réclamation, quelle est la procédure ?"
+    }
+  ],
+  "darija": [
+    {
+      "topic": "products",
+      "expected_intent": "product_price_availability",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "wach mazal kayn {available_product_1} f stock? w chhal taman dyalo?"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_category_lookup",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "vague"
+      ],
+      "query_text": "بغيت شي حاجة مزيانة من catégorie {category_2}, شنو عندكم دابا؟"
+    },
+    {
+      "topic": "products",
+      "expected_intent": "product_availability",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "out_of_stock_check"
+      ],
+      "query_text": "هاد {unavailable_product_1} باقي مقطوع ولا رجع؟"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_hours",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "شنو هي les horaires dyalkom nhar السبت؟ و الأحد مسدودين؟"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "business_contact_location",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "فين كاين المحل ديالكم ف {city} و شنو numéro li n9dar نتاصل بيه؟"
+    },
+    {
+      "topic": "profile",
+      "expected_intent": "return_policy",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "polite"
+      ],
+      "query_text": "ila chrit produit w ma3jbnich, واش عندي {return_days} أيام باش نرجعو؟"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_fee_eta",
+      "difficulty": "easy",
+      "edge_case_tags": [],
+      "query_text": "wach kayn delivery l {delivery_zone_2}? chhal frais w ch7al kaywsel?"
+    },
+    {
+      "topic": "delivery",
+      "expected_intent": "delivery_tracking",
+      "difficulty": "medium",
+      "edge_case_tags": [
+        "multi_intent"
+      ],
+      "query_text": "ana f {delivery_zone_3}, ila commandit lyoum واش غادي نتبع colis dyali?"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "medium",
+      "edge_case_tags": [],
+      "query_text": "درت commande من قبل، واش نقدر نبدلها قبل ما تخرج مع livreur؟"
+    },
+    {
+      "topic": "orders",
+      "expected_intent": "order_handoff",
+      "difficulty": "hard",
+      "edge_case_tags": [
+        "rude_tone",
+        "multi_intent"
+      ],
+      "query_text": "هادشي طول بزاف. بغيت نلغي commande و نبعث شكاية، ندير شنو؟"
+    }
+  ]
+}
