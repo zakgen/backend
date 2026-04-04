@@ -108,13 +108,24 @@ class OrderRepository:
         status_value: str,
         confirmation_status: str,
         metadata: dict[str, Any] | None = None,
+        finalized_order: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        finalized_order = finalized_order or {}
         result = await self.session.execute(
             text(
                 """
                 UPDATE orders
                 SET status = :status_value,
                     confirmation_status = :confirmation_status,
+                    customer_phone = COALESCE(:customer_phone, customer_phone),
+                    preferred_language = COALESCE(:preferred_language, preferred_language),
+                    total_amount = COALESCE(:total_amount, total_amount),
+                    currency = COALESCE(:currency, currency),
+                    payment_method = COALESCE(:payment_method, payment_method),
+                    delivery_city = COALESCE(:delivery_city, delivery_city),
+                    delivery_address = COALESCE(:delivery_address, delivery_address),
+                    order_notes = COALESCE(:order_notes, order_notes),
+                    items = COALESCE(CAST(:items AS jsonb), items),
                     metadata = CAST(:metadata AS jsonb),
                     updated_at = timezone('utc', now())
                 WHERE business_id = :business_id
@@ -131,6 +142,21 @@ class OrderRepository:
                 "order_id": order_id,
                 "status_value": status_value,
                 "confirmation_status": confirmation_status,
+                "customer_phone": normalize_phone_number(
+                    finalized_order.get("customer_phone", "")
+                )
+                if finalized_order.get("customer_phone")
+                else None,
+                "preferred_language": finalized_order.get("preferred_language"),
+                "total_amount": finalized_order.get("total_amount"),
+                "currency": finalized_order.get("currency"),
+                "payment_method": finalized_order.get("payment_method"),
+                "delivery_city": finalized_order.get("delivery_city"),
+                "delivery_address": finalized_order.get("delivery_address"),
+                "order_notes": finalized_order.get("order_notes"),
+                "items": _json_dumps(finalized_order["items"])
+                if "items" in finalized_order
+                else None,
                 "metadata": _json_dumps(metadata or {}),
             },
         )
@@ -364,4 +390,3 @@ class OrderConfirmationRepository:
             {"session_id": session_id, "limit": limit},
         )
         return [dict(row) for row in result.mappings().all()]
-

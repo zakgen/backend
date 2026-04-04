@@ -216,17 +216,32 @@ class OrderConfirmationService:
             session_update["structured_snapshot"] = snapshot
         order_status = order_row.get("status") or "pending_confirmation"
         confirmation_status = order_row.get("confirmation_status") or session_row["status"]
+        finalized_order: dict[str, Any] | None = None
         outbound_text: str
         event_type: str
         needs_human = False
         event_payload: dict[str, Any] = {"message": message_text, "action": action}
 
         if action == "confirm":
-            session_update.update({"status": "confirmed", "confirmed_at": datetime.now(UTC), "needs_human": False})
+            snapshot, finalized_order = self._prepare_confirmed_order_snapshot(
+                session_row=session_row,
+                snapshot=snapshot,
+                order_row=order_row,
+                language=language,
+            )
+            session_update.update(
+                {
+                    "status": "confirmed",
+                    "confirmed_at": datetime.now(UTC),
+                    "needs_human": False,
+                    "structured_snapshot": snapshot,
+                }
+            )
             order_status = "confirmed"
             confirmation_status = "confirmed"
             event_type = "customer_confirmed"
             outbound_text = self._build_confirmed_reply(language, order_row)
+            event_payload["finalized_order"] = finalized_order
         elif action == "decline":
             session_update.update({"status": "declined", "declined_at": datetime.now(UTC), "needs_human": True})
             order_status = "cancelled_by_customer"
@@ -258,6 +273,7 @@ class OrderConfirmationService:
                 outbound_text,
                 needs_human,
                 snapshot,
+                finalized_order,
             ) = self._apply_ai_interpretation(
                 interpretation=interpretation,
                 session_row=session_row,
@@ -323,7 +339,12 @@ class OrderConfirmationService:
             order_id=int(order_row["id"]),
             status_value=order_status,
             confirmation_status=confirmation_status,
-            metadata=dict(order_row.get("metadata") or {}),
+            metadata=self._build_order_metadata(
+                order_row=order_row,
+                snapshot=snapshot,
+                confirmation_status=confirmation_status,
+            ),
+            finalized_order=finalized_order,
         )
         await self.order_confirmation_repository.add_event(
             business_id=business_id,
@@ -388,10 +409,11 @@ class OrderConfirmationService:
         default_session_update: dict[str, Any],
         default_order_status: str,
         default_confirmation_status: str,
-    ) -> tuple[dict[str, Any], str, str, str, str, bool, dict[str, Any]]:
+    ) -> tuple[dict[str, Any], str, str, str, str, bool, dict[str, Any], dict[str, Any] | None]:
         session_update = dict(default_session_update)
         order_status = default_order_status
         confirmation_status = default_confirmation_status
+        finalized_order: dict[str, Any] | None = None
         needs_human = interpretation.needs_human or interpretation.confidence < 0.55
         applied_edits, ambiguous_edits, snapshot = self._apply_interpreted_edits_to_snapshot(
             snapshot=snapshot,
@@ -405,11 +427,18 @@ class OrderConfirmationService:
         secondary_actions = set(interpretation.secondary_actions)
 
         if primary_action == "confirm" and not needs_human and not interpretation.edits:
+            snapshot, finalized_order = self._prepare_confirmed_order_snapshot(
+                session_row=session_row,
+                snapshot=snapshot,
+                order_row=order_row,
+                language=language,
+            )
             session_update.update(
                 {
                     "status": "confirmed",
                     "confirmed_at": datetime.now(UTC),
                     "needs_human": False,
+                    "structured_snapshot": snapshot,
                 }
             )
             return (
@@ -420,6 +449,7 @@ class OrderConfirmationService:
                 self._build_confirmed_reply(language, order_row),
                 False,
                 snapshot,
+                finalized_order,
             )
 
         if primary_action == "decline":
@@ -439,6 +469,7 @@ class OrderConfirmationService:
                 self._build_declined_reply(language),
                 True,
                 snapshot,
+                None,
             )
 
         if primary_action == "edit_request" or interpretation.edits or "edit_request" in secondary_actions:
@@ -458,6 +489,7 @@ class OrderConfirmationService:
                     self._build_human_reply(language),
                     True,
                     snapshot,
+                    None,
                 )
 
             snapshot["latest_detected_edits"] = applied_edits
@@ -478,6 +510,7 @@ class OrderConfirmationService:
                 self._build_edit_interpretation_reply(language, interpretation, snapshot),
                 False,
                 snapshot,
+                None,
             )
 
         if primary_action == "delivery_question":
@@ -490,6 +523,7 @@ class OrderConfirmationService:
                 self._build_delivery_question_reply(language, order_row, snapshot),
                 False,
                 snapshot,
+                None,
             )
 
         if primary_action == "payment_question":
@@ -502,6 +536,7 @@ class OrderConfirmationService:
                 self._build_payment_question_reply(language, order_row),
                 False,
                 snapshot,
+                None,
             )
 
         if primary_action == "return_policy_question":
@@ -514,6 +549,7 @@ class OrderConfirmationService:
                 self._build_return_policy_question_reply(language),
                 False,
                 snapshot,
+                None,
             )
 
         if primary_action == "support_request" or needs_human:
@@ -532,6 +568,7 @@ class OrderConfirmationService:
                 self._build_human_reply(language),
                 True,
                 snapshot,
+                None,
             )
 
         session_update.update(
@@ -549,6 +586,7 @@ class OrderConfirmationService:
             self._build_fallback_reply(language),
             True,
             snapshot,
+            None,
         )
 
     async def list_sessions(
@@ -585,10 +623,23 @@ class OrderConfirmationService:
         update_payload: dict[str, Any]
         order_status: str
         confirmation_status: str
+        finalized_order: dict[str, Any] | None = None
+        metadata_snapshot = dict(session_row.get("structured_snapshot") or {})
         event_type: str
 
         if action == "confirm":
-            update_payload = {"status": "confirmed", "needs_human": False, "confirmed_at": datetime.now(UTC)}
+            metadata_snapshot, finalized_order = self._prepare_confirmed_order_snapshot(
+                session_row=session_row,
+                snapshot=metadata_snapshot,
+                order_row=order_row,
+                language=language,
+            )
+            update_payload = {
+                "status": "confirmed",
+                "needs_human": False,
+                "confirmed_at": datetime.now(UTC),
+                "structured_snapshot": metadata_snapshot,
+            }
             order_status = "confirmed"
             confirmation_status = "confirmed"
             event_type = "admin_confirmed"
@@ -648,14 +699,19 @@ class OrderConfirmationService:
             order_id=int(order_row["id"]),
             status_value=order_status,
             confirmation_status=confirmation_status,
-            metadata=dict(order_row.get("metadata") or {}),
+            metadata=self._build_order_metadata(
+                order_row=order_row,
+                snapshot=metadata_snapshot,
+                confirmation_status=confirmation_status,
+            ),
+            finalized_order=finalized_order,
         )
         await self.order_confirmation_repository.add_event(
             business_id=business_id,
             session_id=session_id,
             order_id=int(order_row["id"]),
             event_type=event_type,
-            payload={"note": payload.note},
+            payload={"note": payload.note, "finalized_order": finalized_order},
         )
         return {
             **session_row,
@@ -741,6 +797,76 @@ class OrderConfirmationService:
             "payment_method": order_row.get("payment_method"),
             "order_notes": order_row.get("order_notes"),
         }
+
+    def _prepare_confirmed_order_snapshot(
+        self,
+        *,
+        session_row: dict[str, Any],
+        snapshot: dict[str, Any],
+        order_row: dict[str, Any],
+        language: str,
+    ) -> tuple[dict[str, Any], dict[str, Any]]:
+        finalized_snapshot = dict(snapshot)
+        finalized_snapshot["preferred_language"] = language
+        finalized_snapshot["confirmation_status"] = "confirmed"
+        finalized_snapshot["awaiting_final_confirmation_after_edits"] = False
+        finalized_snapshot["finalized_at"] = to_iso(datetime.now(UTC))
+        latest_detected_edits = list(finalized_snapshot.get("latest_detected_edits") or [])
+        if latest_detected_edits:
+            finalized_snapshot["confirmed_edits"] = latest_detected_edits
+        finalized_order = self._build_finalized_order_payload(
+            session_row=session_row,
+            order_row=order_row,
+            snapshot=finalized_snapshot,
+            language=language,
+        )
+        finalized_snapshot["finalized_order"] = finalized_order
+        return finalized_snapshot, finalized_order
+
+    def _build_finalized_order_payload(
+        self,
+        *,
+        session_row: dict[str, Any],
+        order_row: dict[str, Any],
+        snapshot: dict[str, Any],
+        language: str,
+    ) -> dict[str, Any]:
+        computed_total = self._calculate_snapshot_total(snapshot)
+        finalized_order = {
+            "customer_phone": snapshot.get("customer_phone") or order_row.get("customer_phone"),
+            "preferred_language": language,
+            "total_amount": computed_total
+            if computed_total is not None
+            else snapshot.get("total_amount", order_row.get("total_amount")),
+            "currency": snapshot.get("currency") or order_row.get("currency") or "MAD",
+            "payment_method": snapshot.get("payment_method") or order_row.get("payment_method"),
+            "delivery_city": snapshot.get("delivery_city") or order_row.get("delivery_city"),
+            "delivery_address": snapshot.get("delivery_address")
+            or order_row.get("delivery_address"),
+            "order_notes": snapshot.get("order_notes") or order_row.get("order_notes"),
+            "items": list(snapshot.get("items") or order_row.get("items") or []),
+        }
+        return finalized_order
+
+    def _build_order_metadata(
+        self,
+        *,
+        order_row: dict[str, Any],
+        snapshot: dict[str, Any],
+        confirmation_status: str,
+    ) -> dict[str, Any]:
+        metadata = dict(order_row.get("metadata") or {})
+        if confirmation_status == "confirmed":
+            metadata["order_confirmation"] = {
+                "final_snapshot_applied": True,
+                "finalized_at": snapshot.get("finalized_at") or to_iso(datetime.now(UTC)),
+                "confirmed_edits": list(
+                    snapshot.get("confirmed_edits")
+                    or snapshot.get("latest_detected_edits")
+                    or []
+                ),
+            }
+        return metadata
 
     def _build_initial_confirmation_message(
         self,

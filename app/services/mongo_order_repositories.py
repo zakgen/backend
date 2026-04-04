@@ -110,6 +110,7 @@ class MongoOrderRepository:
         status_value: str,
         confirmation_status: str,
         metadata: dict[str, Any] | None = None,
+        finalized_order: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         existing = await self.db.orders.find_one({"business_id": business_id, "id": order_id})
         if existing is None:
@@ -117,6 +118,7 @@ class MongoOrderRepository:
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail=f"Order {order_id} was not found for business {business_id}.",
             )
+        finalized_order = finalized_order or {}
         updated = {
             **existing,
             "status": status_value,
@@ -124,6 +126,20 @@ class MongoOrderRepository:
             "metadata": metadata or {},
             "updated_at": _utc_now(),
         }
+        if "customer_phone" in finalized_order and finalized_order.get("customer_phone"):
+            updated["customer_phone"] = normalize_phone_number(finalized_order["customer_phone"])
+        for field in (
+            "preferred_language",
+            "total_amount",
+            "currency",
+            "payment_method",
+            "delivery_city",
+            "delivery_address",
+            "order_notes",
+            "items",
+        ):
+            if field in finalized_order and finalized_order[field] is not None:
+                updated[field] = finalized_order[field]
         await self.db.orders.replace_one({"_id": existing["_id"]}, updated)
         return _copy_doc(updated) or {}
 
@@ -264,4 +280,3 @@ class MongoOrderConfirmationRepository:
         rows = await self.db.order_confirmation_events.find({"session_id": session_id}).to_list(length=None)
         rows.sort(key=lambda row: (row.get("created_at"), row.get("id", 0)))
         return [(_copy_doc(row) or {}) for row in rows[:limit]]
-

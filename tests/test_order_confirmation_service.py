@@ -201,13 +201,32 @@ class FakeOrderRepository:
         assert self.row is not None
         return self.row
 
-    async def update_order_status(self, *, business_id: int, order_id: int, status_value: str, confirmation_status: str, metadata: dict | None = None):
+    async def update_order_status(
+        self,
+        *,
+        business_id: int,
+        order_id: int,
+        status_value: str,
+        confirmation_status: str,
+        metadata: dict | None = None,
+        finalized_order: dict | None = None,
+    ):
         assert self.row is not None
+        finalized_order = finalized_order or {}
         self.row = {
             **self.row,
             "status": status_value,
             "confirmation_status": confirmation_status,
             "metadata": metadata or {},
+            "customer_phone": finalized_order.get("customer_phone", self.row.get("customer_phone")),
+            "preferred_language": finalized_order.get("preferred_language", self.row.get("preferred_language")),
+            "total_amount": finalized_order.get("total_amount", self.row.get("total_amount")),
+            "currency": finalized_order.get("currency", self.row.get("currency")),
+            "payment_method": finalized_order.get("payment_method", self.row.get("payment_method")),
+            "delivery_city": finalized_order.get("delivery_city", self.row.get("delivery_city")),
+            "delivery_address": finalized_order.get("delivery_address", self.row.get("delivery_address")),
+            "order_notes": finalized_order.get("order_notes", self.row.get("order_notes")),
+            "items": finalized_order.get("items", self.row.get("items")),
             "updated_at": datetime.now(UTC),
         }
         return self.row
@@ -750,6 +769,10 @@ def test_final_confirmation_after_edits_marks_order_confirmed() -> None:
     assert handled is True
     assert confirmation_repository.session["status"] == "confirmed"
     assert order_repository.row["confirmation_status"] == "confirmed"
+    assert order_repository.row["status"] == "confirmed"
+    assert order_repository.row["items"][0]["variant"] == "White"
+    assert order_repository.row["preferred_language"] == "english"
+    assert order_repository.row["metadata"]["order_confirmation"]["final_snapshot_applied"] is True
     assert confirmation_repository.session["preferred_language"] == "english"
     assert chat_repository.analysis_updates == [(58, "autre", False)]
     assert service.llm_provider.detect_calls == []
@@ -1061,6 +1084,76 @@ def test_language_detection_failure_keeps_existing_session_language() -> None:
     assert handled is True
     assert confirmation_repository.session["preferred_language"] == "french"
     assert "Détails de livraison" in chat_repository.messages[0]["text"]
+
+
+def test_admin_confirm_applies_final_snapshot_to_order() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    confirmation_repository.session = {
+        "id": 21,
+        "business_id": 2,
+        "order_id": 10,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "english",
+        "status": "awaiting_customer",
+        "needs_human": False,
+        "last_detected_intent": "awaiting_final_confirmation_after_edits",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": None,
+        "confirmed_at": None,
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {
+            "preferred_language": "english",
+            "awaiting_final_confirmation_after_edits": True,
+            "latest_detected_edits": [{"field": "delivery_city", "value": "Tanger"}],
+            "delivery_city": "Tanger",
+            "delivery_address": "Centre Ville",
+            "items": [{"product_name": "BMW 120D", "quantity": 1, "variant": "White"}],
+            "currency": "MAD",
+            "total_amount": 100000.0,
+        },
+    }
+    order_repository.row = {
+        "id": 10,
+        "business_id": 2,
+        "source_store": "generic",
+        "external_order_id": "WC-1001",
+        "customer_name": "Lina",
+        "customer_phone": "+212600000001",
+        "preferred_language": "french",
+        "total_amount": 100000.0,
+        "currency": "MAD",
+        "payment_method": "cash_on_delivery",
+        "delivery_city": "Casablanca",
+        "delivery_address": "Maarif",
+        "order_notes": None,
+        "items": [{"product_name": "BMW 120D", "quantity": 1, "variant": "Black"}],
+        "metadata": {},
+        "raw_payload": {},
+        "status": "pending_confirmation",
+        "confirmation_status": "awaiting_customer",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+
+    import asyncio
+
+    detail = asyncio.run(
+        service.apply_action(
+            2,
+            21,
+            OrderConfirmationActionRequest(action="confirm"),
+        )
+    )
+
+    assert detail["status"] == "confirmed"
+    assert detail["order"]["status"] == "confirmed"
+    assert detail["order"]["delivery_city"] == "Tanger"
+    assert detail["order"]["items"][0]["variant"] == "White"
+    assert detail["order"]["metadata"]["order_confirmation"]["final_snapshot_applied"] is True
+    assert confirmation_repository.events[-1]["payload"]["finalized_order"]["delivery_city"] == "Tanger"
+    assert chat_repository.messages == []
 
 
 def test_low_confidence_edit_escalates_to_human() -> None:
