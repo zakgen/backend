@@ -162,19 +162,33 @@ class OrderConfirmationService:
             return False
 
         message_text = str(inbound_row.get("text") or "")
-        try:
-            language_hint, _ = await self.llm_provider.detect_language(message=message_text)
-        except Exception:
-            language_hint = str(session_row.get("preferred_language") or "")
-        language = normalize_language_label(
-            language_hint or session_row.get("preferred_language"),
-            fallback=normalize_language_label(session_row.get("preferred_language"), "french"),
+        snapshot = dict(session_row.get("structured_snapshot") or {})
+        session_language = normalize_language_label(
+            session_row.get("preferred_language")
+            or snapshot.get("preferred_language"),
+            "french",
         )
         order_row = await self.order_repository.get_by_id(
             business_id, int(session_row["order_id"])
         )
-        snapshot = dict(session_row.get("structured_snapshot") or {})
         action = self._detect_customer_action(message_text)
+        should_detect_language = action is None and self._should_detect_language_for_message(
+            message_text
+        )
+        language = session_language
+        should_persist_language = False
+        if should_detect_language:
+            try:
+                detected_language, _ = await self.llm_provider.detect_language(
+                    message=message_text
+                )
+            except Exception:
+                detected_language = session_language
+            language = normalize_language_label(
+                detected_language,
+                fallback=session_language,
+            )
+            should_persist_language = language != session_language
         interpretation: OrderSessionInterpretation | None = None
         if action is None:
             interpretation = await self._interpret_session_message(
@@ -183,21 +197,29 @@ class OrderConfirmationService:
                 order_row=order_row,
                 snapshot=snapshot,
             )
-            language = normalize_language_label(
+            interpreted_language = normalize_language_label(
                 interpretation.language,
                 fallback=language,
             )
+            if should_detect_language:
+                language = interpreted_language
+                should_persist_language = language != session_language
+        if should_persist_language:
+            snapshot["preferred_language"] = language
         session_update: dict[str, Any] = {
-            "preferred_language": language,
             "last_customer_message_at": datetime.now(UTC),
             "last_detected_intent": action
             or (interpretation.primary_action if interpretation is not None else "free_text"),
         }
+        if should_persist_language:
+            session_update["preferred_language"] = language
+            session_update["structured_snapshot"] = snapshot
         order_status = order_row.get("status") or "pending_confirmation"
         confirmation_status = order_row.get("confirmation_status") or session_row["status"]
         outbound_text: str
         event_type: str
         needs_human = False
+        event_payload: dict[str, Any] = {"message": message_text, "action": action}
 
         if action == "confirm":
             session_update.update({"status": "confirmed", "confirmed_at": datetime.now(UTC), "needs_human": False})
@@ -213,12 +235,12 @@ class OrderConfirmationService:
             outbound_text = self._build_declined_reply(language)
             needs_human = True
         elif action == "request_edit":
-            session_update.update({"status": "edit_requested", "needs_human": True})
-            order_status = "needs_review"
-            confirmation_status = "edit_requested"
+            session_update.update({"status": "edit_requested", "needs_human": False})
+            order_status = "pending_confirmation"
+            confirmation_status = "awaiting_customer"
             event_type = "customer_requested_edit"
             outbound_text = self._build_edit_reply(language)
-            needs_human = True
+            event_payload["automation_outcome"] = "collecting_edit_details"
         elif action == "request_human":
             session_update.update({"status": "human_requested", "needs_human": True})
             order_status = "needs_review"
@@ -226,6 +248,7 @@ class OrderConfirmationService:
             event_type = "customer_requested_human"
             outbound_text = self._build_human_reply(language)
             needs_human = True
+            event_payload["automation_outcome"] = "human_review"
         elif interpretation is not None:
             (
                 session_update,
@@ -244,6 +267,21 @@ class OrderConfirmationService:
                 default_session_update=session_update,
                 default_order_status=order_status,
                 default_confirmation_status=confirmation_status,
+            )
+            event_payload.update(
+                {
+                    "normalized_edits": snapshot.get("latest_detected_edits")
+                    or [{"field": edit.field, "value": edit.value} for edit in interpretation.edits],
+                    "automation_outcome": "awaiting_final_confirmation"
+                    if snapshot.get("awaiting_final_confirmation_after_edits") and not needs_human
+                    else "human_review"
+                    if needs_human
+                    else "automated_answer",
+                    "applied_to_snapshot": bool(snapshot.get("latest_detected_edits")),
+                    "awaiting_final_confirmation_after_edits": bool(
+                        snapshot.get("awaiting_final_confirmation_after_edits")
+                    ),
+                }
             )
         elif session_row["status"] == "edit_requested":
             pending_edits = list(snapshot.get("pending_edits") or [])
@@ -266,6 +304,7 @@ class OrderConfirmationService:
             event_type = "customer_shared_edit_details"
             outbound_text = self._build_edit_details_reply(language)
             needs_human = True
+            event_payload["automation_outcome"] = "human_review"
         else:
             session_update.update({"status": "human_requested", "needs_human": True})
             order_status = "needs_review"
@@ -273,6 +312,7 @@ class OrderConfirmationService:
             event_type = "customer_unrecognized_reply"
             outbound_text = self._build_fallback_reply(language)
             needs_human = True
+            event_payload["automation_outcome"] = "human_review"
 
         session_row = await self.order_confirmation_repository.update_session(
             int(session_row["id"]),
@@ -290,11 +330,8 @@ class OrderConfirmationService:
             session_id=int(session_row["id"]),
             order_id=int(order_row["id"]),
             event_type=event_type,
-            payload={
-                "message": message_text,
-                "action": action,
-                "ai_interpretation": interpretation.model_dump() if interpretation is not None else None,
-            },
+            payload=event_payload
+            | {"ai_interpretation": interpretation.model_dump() if interpretation is not None else None},
         )
         await self.chat_repository.update_message_analysis(
             int(inbound_row["id"]),
@@ -356,18 +393,13 @@ class OrderConfirmationService:
         order_status = default_order_status
         confirmation_status = default_confirmation_status
         needs_human = interpretation.needs_human or interpretation.confidence < 0.55
-
-        if interpretation.edits:
-            pending_edits = list(snapshot.get("pending_edits") or [])
-            for edit in interpretation.edits:
-                pending_edits.append(
-                    {
-                        "field": edit.field,
-                        "value": edit.value,
-                        "received_at": to_iso(datetime.now(UTC)),
-                    }
-                )
-            snapshot["pending_edits"] = pending_edits
+        applied_edits, ambiguous_edits, snapshot = self._apply_interpreted_edits_to_snapshot(
+            snapshot=snapshot,
+            order_row=order_row,
+            interpretation=interpretation,
+        )
+        if ambiguous_edits:
+            needs_human = True
 
         primary_action = interpretation.primary_action
         secondary_actions = set(interpretation.secondary_actions)
@@ -410,20 +442,41 @@ class OrderConfirmationService:
             )
 
         if primary_action == "edit_request" or interpretation.edits or "edit_request" in secondary_actions:
+            if needs_human:
+                session_update.update(
+                    {
+                        "status": "human_requested",
+                        "needs_human": True,
+                        "structured_snapshot": snapshot,
+                    }
+                )
+                return (
+                    session_update,
+                    "needs_review",
+                    "human_requested",
+                    "customer_requested_edit_ai",
+                    self._build_human_reply(language),
+                    True,
+                    snapshot,
+                )
+
+            snapshot["latest_detected_edits"] = applied_edits
+            snapshot["awaiting_final_confirmation_after_edits"] = True
             session_update.update(
                 {
-                    "status": "edit_requested",
-                    "needs_human": True,
+                    "status": "awaiting_customer",
+                    "needs_human": False,
+                    "last_detected_intent": "awaiting_final_confirmation_after_edits",
                     "structured_snapshot": snapshot,
                 }
             )
             return (
                 session_update,
-                "needs_review",
-                "edit_requested",
+                "pending_confirmation",
+                "awaiting_customer",
                 "customer_requested_edit_ai",
-                self._build_edit_interpretation_reply(language, interpretation),
-                True,
+                self._build_edit_interpretation_reply(language, interpretation, snapshot),
+                False,
                 snapshot,
             )
 
@@ -788,6 +841,38 @@ class OrderConfirmationService:
             return "request_human"
         return None
 
+    def _should_detect_language_for_message(self, message: str) -> bool:
+        normalized = message.strip().lower()
+        if not normalized:
+            return False
+        if normalized in {"1", "2", "3", "4"}:
+            return False
+        weak_acknowledgements = {
+            "ok",
+            "okay",
+            "yes",
+            "oui",
+            "no",
+            "non",
+            "merci",
+            "thanks",
+            "thank you",
+            "wakha",
+            "safi",
+            "تمام",
+            "نعم",
+            "لا",
+        }
+        if normalized in weak_acknowledgements:
+            return False
+        alpha_chars = sum(1 for char in normalized if char.isalpha())
+        word_count = len([word for word in normalized.split() if word])
+        if alpha_chars < 5:
+            return False
+        if word_count <= 1 and alpha_chars <= 6:
+            return False
+        return True
+
     def _build_confirmed_reply(self, language: str, order_row: dict[str, Any]) -> str:
         order_ref = str(order_row.get("external_order_id") or order_row.get("id"))
         if language == "english":
@@ -845,41 +930,184 @@ class OrderConfirmationService:
         return "Merci, votre demande de modification a bien été reçue. Notre équipe va la vérifier et revenir vers vous sur WhatsApp."
 
     def _build_edit_interpretation_reply(
-        self, language: str, interpretation: OrderSessionInterpretation
+        self,
+        language: str,
+        interpretation: OrderSessionInterpretation,
+        snapshot: dict[str, Any],
     ) -> str:
         changes = ", ".join(f"{edit.field}: {edit.value}" for edit in interpretation.edits[:3])
+        revised_summary = self._build_snapshot_confirmation_summary(language, snapshot)
+        total_note = self._build_total_update_note(language, snapshot, interpretation)
         if language == "english":
             if changes:
                 return (
                     "✏️ Understood.\n\n"
                     f"I noted these requested changes: {changes}.\n"
-                    "Our team will review them and continue with you on WhatsApp."
+                    f"{revised_summary}\n\n"
+                    f"{total_note}\n\n"
+                    "Reply 1 to confirm the updated order or send another change."
                 )
             return (
                 "✏️ Understood.\n\n"
-                "I noted your change request and our team will review it with you on WhatsApp."
+                f"{revised_summary}\n\n"
+                "Reply 1 to confirm the updated order or send another change."
             )
         if language == "darija":
             if changes:
                 return (
                     "✏️ Wad7.\n\n"
                     f"Tsjlo had talabat dyal التعديل: {changes}.\n"
-                    "L'équipe dyalna ghadi tراجعهم w تكمل m3ak f WhatsApp."
+                    f"{revised_summary}\n\n"
+                    f"{total_note}\n\n"
+                    "Jawb b 1 bach tconfirmi l commande b ta3dilat jdod, wela sift taghyir akhor."
                 )
             return (
                 "✏️ Wad7.\n\n"
-                "Tsjlat talab dyal التعديل, w l'équipe dyalna ghadi تكمل m3ak f WhatsApp."
+                f"{revised_summary}\n\n"
+                "Jawb b 1 bach tconfirmi l commande b ta3dilat jdod, wela sift taghyir akhor."
             )
         if changes:
             return (
                 "✏️ C'est noté.\n\n"
                 f"J'ai enregistré ces changements demandés : {changes}.\n"
-                "Notre équipe va les vérifier et poursuivre avec vous sur WhatsApp."
+                f"{revised_summary}\n\n"
+                f"{total_note}\n\n"
+                "Répondez 1 pour confirmer la commande mise à jour ou envoyez un autre changement."
             )
         return (
             "✏️ C'est noté.\n\n"
-            "Votre demande de modification a été enregistrée et notre équipe poursuivra avec vous sur WhatsApp."
+            f"{revised_summary}\n\n"
+            "Répondez 1 pour confirmer la commande mise à jour ou envoyez un autre changement."
         )
+
+    def _apply_interpreted_edits_to_snapshot(
+        self,
+        *,
+        snapshot: dict[str, Any],
+        order_row: dict[str, Any],
+        interpretation: OrderSessionInterpretation,
+    ) -> tuple[list[dict[str, Any]], list[dict[str, Any]], dict[str, Any]]:
+        updated_snapshot = dict(snapshot)
+        items = [dict(item) for item in (updated_snapshot.get("items") or order_row.get("items") or [])]
+        updated_snapshot["items"] = items
+        pending_edits = list(updated_snapshot.get("pending_edits") or [])
+        applied: list[dict[str, Any]] = []
+        ambiguous: list[dict[str, Any]] = []
+        multi_item = len(items) > 1
+
+        for edit in interpretation.edits:
+            normalized_edit = {
+                "field": edit.field,
+                "value": edit.value,
+                "received_at": to_iso(datetime.now(UTC)),
+            }
+            pending_edits.append(normalized_edit)
+            applied_successfully = False
+
+            if edit.field == "delivery_city":
+                updated_snapshot["delivery_city"] = edit.value
+                applied_successfully = True
+            elif edit.field == "delivery_address":
+                updated_snapshot["delivery_address"] = edit.value
+                applied_successfully = True
+            elif edit.field == "customer_phone":
+                updated_snapshot["customer_phone"] = edit.value
+                applied_successfully = True
+            elif items and not multi_item and edit.field in {"variant", "quantity", "product_name"}:
+                target_item = items[0]
+                if edit.field == "quantity":
+                    try:
+                        target_item["quantity"] = max(1, int(str(edit.value).strip()))
+                        applied_successfully = True
+                    except ValueError:
+                        applied_successfully = False
+                elif edit.field == "variant":
+                    target_item["variant"] = edit.value
+                    applied_successfully = True
+                elif edit.field == "product_name":
+                    target_item["product_name"] = edit.value
+                    applied_successfully = True
+            elif edit.field in {"variant", "quantity", "product_name"} and multi_item:
+                applied_successfully = False
+
+            if applied_successfully:
+                applied.append(normalized_edit)
+            else:
+                ambiguous.append(normalized_edit)
+
+        updated_snapshot["pending_edits"] = pending_edits
+        return applied, ambiguous, updated_snapshot
+
+    def _build_snapshot_confirmation_summary(self, language: str, snapshot: dict[str, Any]) -> str:
+        items = snapshot.get("items") or []
+        items_summary = ", ".join(self._item_summary(item) for item in items[:3]) or "-"
+        amount = self._calculate_snapshot_total(snapshot)
+        if amount is None:
+            amount_line = f"{snapshot.get('total_amount', 0)} {snapshot.get('currency') or 'MAD'}"
+        else:
+            amount_line = f"{amount} {snapshot.get('currency') or 'MAD'}"
+        address_bits = [
+            str(snapshot.get("delivery_city") or "").strip(),
+            str(snapshot.get("delivery_address") or "").strip(),
+        ]
+        address = ", ".join(bit for bit in address_bits if bit) or "-"
+        if language == "english":
+            return (
+                "Updated order summary:\n"
+                f"📦 Items: {items_summary}\n"
+                f"💰 Total: {amount_line}\n"
+                f"📍 Delivery: {address}"
+            )
+        if language == "darija":
+            return (
+                "Hadchi howa l update dyal commande:\n"
+                f"📦 Talab: {items_summary}\n"
+                f"💰 Total: {amount_line}\n"
+                f"📍 Delivery: {address}"
+            )
+        return (
+            "Résumé mis à jour de la commande :\n"
+            f"📦 Articles : {items_summary}\n"
+            f"💰 Total : {amount_line}\n"
+            f"📍 Livraison : {address}"
+        )
+
+    def _calculate_snapshot_total(self, snapshot: dict[str, Any]) -> float | None:
+        items = snapshot.get("items") or []
+        computed_total = 0.0
+        has_price = False
+        for item in items:
+            unit_price = item.get("unit_price")
+            if unit_price is None:
+                continue
+            try:
+                computed_total += float(unit_price) * int(item.get("quantity") or 1)
+                has_price = True
+            except (TypeError, ValueError):
+                return None
+        if has_price:
+            return round(computed_total, 2)
+        return None
+
+    def _build_total_update_note(
+        self,
+        language: str,
+        snapshot: dict[str, Any],
+        interpretation: OrderSessionInterpretation,
+    ) -> str:
+        quantity_changed = any(edit.field == "quantity" for edit in interpretation.edits)
+        recalculated = self._calculate_snapshot_total(snapshot)
+        if quantity_changed and recalculated is None:
+            if language == "english":
+                return "We noted the updated quantity. The final total will be confirmed with the order."
+            if language == "darija":
+                return "Sjlna l quantité jdida. Total النهائي ghadi يتأكد m3a l commande."
+            return "La quantité mise à jour a été enregistrée. Le total final sera confirmé avec la commande."
+        return {
+            "english": "If everything looks right, confirm the updated order below.",
+            "darija": "Ila kolchi mzyan, confirmi l commande b ta3dilat jdod.",
+            "french": "Si tout est correct, confirmez la commande mise à jour ci-dessous.",
+        }[language]
 
     def _build_delivery_question_reply(
         self, language: str, order_row: dict[str, Any], snapshot: dict[str, Any]
