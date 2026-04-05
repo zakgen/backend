@@ -304,6 +304,25 @@ class MongoOrderConfirmationRepository:
         await self.db.order_confirmation_sessions.replace_one({"_id": existing["_id"]}, updated)
         return _copy_doc(updated) or {}
 
+    async def claim_confirmation_send(self, session_id: int) -> bool:
+        from pymongo import ReturnDocument
+
+        row = await self.db.order_confirmation_sessions.find_one_and_update(
+            {
+                "id": session_id,
+                "status": "pending_send",
+                "last_outbound_message_sid": None,
+            },
+            {
+                "$set": {
+                    "last_outbound_message_sid": "__dispatching__",
+                    "updated_at": _utc_now(),
+                }
+            },
+            return_document=ReturnDocument.AFTER,
+        )
+        return row is not None
+
     async def add_event(
         self,
         *,

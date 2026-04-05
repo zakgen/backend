@@ -371,6 +371,23 @@ class OrderConfirmationRepository:
             )
         return dict(row)
 
+    async def claim_confirmation_send(self, session_id: int) -> bool:
+        result = await self.session.execute(
+            text(
+                """
+                UPDATE order_confirmation_sessions
+                SET last_outbound_message_sid = '__dispatching__',
+                    updated_at = timezone('utc', now())
+                WHERE id = :session_id
+                  AND status = 'pending_send'
+                  AND last_outbound_message_sid IS NULL
+                RETURNING id
+                """
+            ),
+            {"session_id": session_id},
+        )
+        return result.mappings().first() is not None
+
     async def add_event(
         self,
         *,

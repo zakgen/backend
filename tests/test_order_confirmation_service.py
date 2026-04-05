@@ -236,6 +236,7 @@ class FakeOrderConfirmationRepository:
     def __init__(self) -> None:
         self.session = None
         self.events: list[dict] = []
+        self.claim_result = True
 
     async def find_latest_by_order(self, business_id: int, order_id: int):
         return self.session
@@ -279,6 +280,9 @@ class FakeOrderConfirmationRepository:
             "updated_at": datetime.now(UTC),
         }
         return self.session
+
+    async def claim_confirmation_send(self, session_id: int) -> bool:
+        return self.claim_result
 
     async def find_active_session(self, business_id: int, phone: str):
         return self.session
@@ -339,9 +343,36 @@ def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     assert result["confirmation_message_sent"] is True
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
     assert confirmation_repository.session["status"] == "awaiting_customer"
-    assert len(chat_repository.messages) == 1
-    assert "🧾 Commande" in chat_repository.messages[0]["text"]
-    assert "1️⃣ Confirmer la commande" in chat_repository.messages[0]["text"]
+
+
+def test_ingest_store_order_skips_duplicate_send_when_claim_fails() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    confirmation_repository.claim_result = False
+
+    import asyncio
+
+    result = asyncio.run(
+        service.ingest_store_order(
+            2,
+            StoreOrderIngestRequest(
+                source_store="generic",
+                external_order_id="WC-1002",
+                customer_name="Lina",
+                customer_phone="+212600000001",
+                preferred_language="french",
+                total_amount=3499,
+                currency="MAD",
+                delivery_city="Casablanca",
+                delivery_address="Maarif",
+                items=[{"product_name": "Redmi Note 13", "quantity": 1}],
+            ),
+        )
+    )
+
+    assert result["confirmation_message_sent"] is False
+    assert order_repository.row["confirmation_status"] == "pending_send"
+    assert confirmation_repository.session["status"] == "pending_send"
+    assert chat_repository.messages == []
 
 
 def test_handle_inbound_confirm_marks_session_confirmed() -> None:

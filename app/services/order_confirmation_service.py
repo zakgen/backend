@@ -108,6 +108,25 @@ class OrderConfirmationService:
 
         confirmation_message_sent = False
         if payload.send_confirmation:
+            send_claimed = await self.order_confirmation_repository.claim_confirmation_send(
+                int(session_row["id"])
+            )
+            if not send_claimed:
+                logger.info(
+                    "Order confirmation send skipped because another worker already claimed it business_id=%s order_id=%s session_id=%s",
+                    business_id,
+                    order_row.get("id"),
+                    session_row.get("id"),
+                )
+                refreshed_session = await self.order_confirmation_repository.get_session(
+                    business_id,
+                    int(session_row["id"]),
+                )
+                return {
+                    "order": order_row,
+                    "session": refreshed_session,
+                    "confirmation_message_sent": False,
+                }
             logger.info(
                 "Order confirmation send requested business_id=%s order_id=%s external_order_id=%s phone=%s",
                 business_id,

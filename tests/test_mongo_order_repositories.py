@@ -148,3 +148,33 @@ async def test_mongo_order_confirmation_create_session_is_idempotent_per_order()
 
     assert first["id"] == second["id"]
     assert len(repository.db.order_confirmation_sessions.documents) == 1
+
+
+@pytest.mark.asyncio
+async def test_mongo_order_confirmation_claim_confirmation_send_is_single_use() -> None:
+    repository = MongoOrderConfirmationRepository(FakeSession())
+    snapshot = {
+        "external_order_id": "6624177684716",
+        "customer_name": "Shopify customer",
+        "customer_phone": "+212773823618",
+        "items": [{"product_name": "Board", "quantity": 1}],
+    }
+    session = await repository.create_session(
+        business_id=1,
+        order_id=11,
+        phone="+212773823618",
+        customer_name="Shopify customer",
+        preferred_language="english",
+        status_value="pending_send",
+        needs_human=False,
+        last_detected_intent="order_confirmation_pending",
+        structured_snapshot=snapshot,
+    )
+
+    first = await repository.claim_confirmation_send(int(session["id"]))
+    second = await repository.claim_confirmation_send(int(session["id"]))
+    refreshed = await repository.get_session(1, int(session["id"]))
+
+    assert first is True
+    assert second is False
+    assert refreshed["last_outbound_message_sid"] == "__dispatching__"
