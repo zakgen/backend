@@ -108,6 +108,13 @@ class OrderConfirmationService:
 
         confirmation_message_sent = False
         if payload.send_confirmation:
+            logger.info(
+                "Order confirmation send requested business_id=%s order_id=%s external_order_id=%s phone=%s",
+                business_id,
+                order_row.get("id"),
+                order_row.get("external_order_id"),
+                order_row.get("customer_phone"),
+            )
             connection = await self._get_ready_whatsapp_connection(business_id)
             confirmation_message = self._build_initial_confirmation_message(
                 business_name=str(business_row.get("name") or ""),
@@ -119,6 +126,12 @@ class OrderConfirmationService:
                 phone=str(order_row["customer_phone"]),
                 text=confirmation_message,
                 connection=connection,
+            )
+            logger.info(
+                "Order confirmation message sent business_id=%s order_id=%s provider_message_sid=%s",
+                business_id,
+                order_row.get("id"),
+                outbound_row.get("provider_message_sid"),
             )
             session_row = await self.order_confirmation_repository.update_session(
                 int(session_row["id"]),
@@ -142,6 +155,13 @@ class OrderConfirmationService:
                 order_id=int(order_row["id"]),
                 event_type="confirmation_sent",
                 payload={"text": confirmation_message},
+            )
+        else:
+            logger.info(
+                "Order confirmation send skipped business_id=%s order_id=%s external_order_id=%s",
+                business_id,
+                order_row.get("id"),
+                order_row.get("external_order_id"),
             )
 
         return {

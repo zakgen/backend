@@ -50,6 +50,7 @@ class ShopifyService:
         self.business_repository = factory.business()
         self.integration_repository = factory.integrations()
         self.order_repository = factory.orders()
+        self.order_confirmation_repository = factory.order_confirmations()
 
     async def begin_oauth_install(
         self,
@@ -231,6 +232,15 @@ class ShopifyService:
     ) -> None:
         if str(order_row.get("source_store") or "") != "shopify":
             return
+        resolved_status = confirmation_status or str(order_row.get("confirmation_status") or "")
+        if resolved_status not in {"confirmed", "human_requested", "declined"}:
+            logger.info(
+                "Skipping Shopify sync-back for non-terminal status business_id=%s order_id=%s status=%s",
+                business_id,
+                order_row.get("id"),
+                resolved_status,
+            )
+            return
         connection = await self.integration_repository.get_connection(business_id, "shopify")
         if connection is None or connection.get("status") != "connected":
             return
@@ -251,15 +261,13 @@ class ShopifyService:
             )
             merged_tags = self._merge_zakbot_tags(
                 current_tags=list(current.get("tags") or []),
-                confirmation_status=confirmation_status
-                or str(order_row.get("confirmation_status") or ""),
+                confirmation_status=resolved_status,
             )
             note = self._build_shopify_order_note(
                 current_note=str(current.get("note") or ""),
                 order_row=order_row,
                 snapshot=snapshot or {},
-                confirmation_status=confirmation_status
-                or str(order_row.get("confirmation_status") or ""),
+                confirmation_status=resolved_status,
             )
             await self._update_shopify_order(
                 shop_domain=shop_domain,
@@ -345,12 +353,24 @@ class ShopifyService:
             source_store="shopify",
             external_order_id=str(payload.get("id") or ""),
         )
+        existing_session = None
+        if existing_order is not None:
+            existing_session = await self.order_confirmation_repository.find_latest_by_order(
+                business_id,
+                int(existing_order["id"]),
+            )
         if event_kind == "updated" and existing_order is not None and (
             existing_order.get("confirmation_status") not in PENDING_CONFIRMATION_STATUSES
             or dict(existing_order.get("metadata") or {})
             .get("order_confirmation", {})
             .get("final_snapshot_applied")
         ):
+            logger.info(
+                "Ignoring Shopify orders/updated for finalized order business_id=%s external_order_id=%s status=%s",
+                business_id,
+                payload.get("id"),
+                existing_order.get("confirmation_status"),
+            )
             await self._touch_shopify_connection(
                 connection=connection,
                 config=config,
@@ -371,21 +391,36 @@ class ShopifyService:
                 last_synced_at=connection.get("last_synced_at"),
             )
             return {"status": "ignored", "reason": "missing_phone"}
-
-        if event_kind == "updated" or existing_order is not None:
+        should_send_confirmation = self._should_send_confirmation(
+            event_kind=event_kind,
+            existing_order=existing_order,
+            existing_session=existing_session,
+        )
+        logger.info(
+            "Processing Shopify order webhook business_id=%s topic=%s external_order_id=%s existing_order=%s existing_session_status=%s send_confirmation=%s phone=%s",
+            business_id,
+            event_topic,
+            order_payload.external_order_id,
+            existing_order is not None,
+            None if existing_session is None else existing_session.get("status"),
+            should_send_confirmation,
+            order_payload.customer_phone,
+        )
+        if not should_send_confirmation:
             order_payload = order_payload.model_copy(update={"send_confirmation": False})
 
         result = await OrderConfirmationService(
             session=self.session,
             messaging_provider=TwilioMessagingProvider(),
         ).ingest_store_order(business_id, order_payload)
-        if str(result["order"].get("confirmation_status") or "") in PENDING_CONFIRMATION_STATUSES:
-            await self.sync_order_confirmation_status(
-                business_id=business_id,
-                order_row=result["order"],
-                snapshot=dict(result["session"].get("structured_snapshot") or {}),
-                confirmation_status=str(result["order"].get("confirmation_status") or ""),
-            )
+        logger.info(
+            "Shopify order webhook ingested business_id=%s order_id=%s session_id=%s confirmation_message_sent=%s confirmation_status=%s",
+            business_id,
+            result["order"].get("id"),
+            result["session"].get("id"),
+            result["confirmation_message_sent"],
+            result["order"].get("confirmation_status"),
+        )
         await self._touch_shopify_connection(
             connection=connection,
             config=config,
@@ -399,6 +434,23 @@ class ShopifyService:
             "order_id": int(result["order"]["id"]),
             "confirmation_message_sent": bool(result["confirmation_message_sent"]),
         }
+
+    def _should_send_confirmation(
+        self,
+        *,
+        event_kind: str,
+        existing_order: dict[str, Any] | None,
+        existing_session: dict[str, Any] | None,
+    ) -> bool:
+        if existing_order is None:
+            return True
+        if existing_session is None:
+            return str(existing_order.get("confirmation_status") or "") == "pending_send"
+        if existing_session.get("status") == "pending_send" and not existing_session.get(
+            "last_outbound_message_sid"
+        ):
+            return True
+        return False
 
     def _map_shopify_order_to_ingest(
         self, payload: dict[str, Any]

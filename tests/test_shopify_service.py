@@ -104,6 +104,12 @@ def _service(http_client: FakeHTTPClient | None = None) -> tuple[ShopifyService,
     service.integration_repository = integration_repository
     order_repository = FakeOrderRepository()
     service.order_repository = order_repository
+
+    class FakeOrderConfirmationRepository:
+        async def find_latest_by_order(self, business_id: int, order_id: int):
+            return None
+
+    service.order_confirmation_repository = FakeOrderConfirmationRepository()
     return service, integration_repository, order_repository
 
 
@@ -301,6 +307,47 @@ def test_sync_order_confirmation_status_updates_tags_and_note() -> None:
     assert integration_repository.connection["config"]["last_sync_back_at"] is not None
 
 
+def test_sync_order_confirmation_status_skips_pending_states() -> None:
+    http_client = FakeHTTPClient()
+    service, integration_repository, _ = _service(http_client)
+    integration_repository.connection = {
+        "id": 11,
+        "business_id": 2,
+        "integration_type": "shopify",
+        "status": "connected",
+        "health": "healthy",
+        "config": {
+            "shop_domain": "demo-shop.myshopify.com",
+            "offline_access_token_encrypted": service.crypto_service.encrypt_text("shpat_123"),
+        },
+        "metrics": {},
+        "last_activity_at": None,
+        "last_synced_at": None,
+    }
+    order_row = {
+        "id": 99,
+        "source_store": "shopify",
+        "external_order_id": "999",
+        "confirmation_status": "awaiting_customer",
+        "raw_payload": {"admin_graphql_api_id": "gid://shopify/Order/1"},
+        "metadata": {},
+    }
+
+    import asyncio
+
+    asyncio.run(
+        service.sync_order_confirmation_status(
+            business_id=2,
+            order_row=order_row,
+            snapshot={},
+            confirmation_status="awaiting_customer",
+        )
+    )
+
+    assert http_client.posts == []
+    assert integration_repository.connection["config"].get("last_sync_back_status") is None
+
+
 def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
     service, integration_repository, _ = _service()
     integration_repository.connection = {
@@ -319,11 +366,6 @@ def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
         "last_synced_at": None,
     }
     integration_repository.find_by_shop["demo-shop.myshopify.com"] = integration_repository.connection
-
-    sync_calls: list[tuple[int, dict, dict, str]] = []
-
-    async def fake_sync(*, business_id: int, order_row: dict, snapshot: dict | None = None, confirmation_status: str | None = None):
-        sync_calls.append((business_id, order_row, snapshot or {}, confirmation_status or ""))
 
     class FakeOrderConfirmationService:
         def __init__(self, *, session, messaging_provider) -> None:
@@ -346,7 +388,6 @@ def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
             }
 
     monkeypatch.setattr(shopify_service_module, "OrderConfirmationService", FakeOrderConfirmationService)
-    monkeypatch.setattr(service, "sync_order_confirmation_status", fake_sync)
     body = json.dumps(
         {
             "id": 999,
@@ -373,4 +414,83 @@ def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
 
     assert result["status"] == "accepted"
     assert result["confirmation_message_sent"] is True
-    assert sync_calls
+
+
+def test_orders_updated_can_trigger_first_confirmation_if_session_is_still_pending_send(monkeypatch) -> None:
+    service, integration_repository, order_repository = _service()
+    integration_repository.connection = {
+        "id": 11,
+        "business_id": 2,
+        "integration_type": "shopify",
+        "status": "connected",
+        "health": "healthy",
+        "config": {
+            "shop_domain": "demo-shop.myshopify.com",
+            "processed_webhook_ids": [],
+        },
+        "metrics": {},
+        "last_activity_at": None,
+        "last_synced_at": None,
+    }
+    integration_repository.find_by_shop["demo-shop.myshopify.com"] = integration_repository.connection
+    order_repository.external_order = {
+        "id": 71,
+        "confirmation_status": "pending_send",
+        "metadata": {},
+    }
+
+    class FakeOrderConfirmationRepository:
+        async def find_latest_by_order(self, business_id: int, order_id: int):
+            return {
+                "id": 17,
+                "status": "pending_send",
+                "last_outbound_message_sid": None,
+            }
+
+    class FakeOrderConfirmationService:
+        def __init__(self, *, session, messaging_provider) -> None:
+            self.session = session
+            self.messaging_provider = messaging_provider
+
+        async def ingest_store_order(self, business_id: int, payload):
+            assert payload.send_confirmation is True
+            return {
+                "order": {
+                    "id": 71,
+                    "source_store": "shopify",
+                    "external_order_id": payload.external_order_id,
+                    "confirmation_status": "awaiting_customer",
+                    "metadata": payload.metadata,
+                    "raw_payload": payload.raw_payload,
+                },
+                "session": {"id": 17, "structured_snapshot": {}},
+                "confirmation_message_sent": True,
+            }
+
+    service.order_confirmation_repository = FakeOrderConfirmationRepository()
+    monkeypatch.setattr(shopify_service_module, "OrderConfirmationService", FakeOrderConfirmationService)
+    body = json.dumps(
+        {
+            "id": 999,
+            "admin_graphql_api_id": "gid://shopify/Order/999",
+            "currency": "MAD",
+            "current_total_price": "100.00",
+            "customer_locale": "fr",
+            "phone": "+212600000001",
+            "shipping_address": {"city": "Casablanca", "address1": "Maarif"},
+            "line_items": [{"title": "Redmi Note 13", "quantity": 1, "price": "100.00"}],
+        }
+    ).encode("utf-8")
+    headers = {
+        "x-shopify-shop-domain": "demo-shop.myshopify.com",
+        "x-shopify-event-id": "evt-4",
+        "x-shopify-topic": "orders/updated",
+        "x-shopify-hmac-sha256": _webhook_hmac("shopify-secret", body),
+    }
+
+    import asyncio
+
+    result = asyncio.run(service.handle_orders_updated(headers=headers, body=body))
+
+    assert result["status"] == "accepted"
+    assert result["confirmation_message_sent"] is True
