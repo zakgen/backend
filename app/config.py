@@ -46,6 +46,12 @@ class Settings(BaseSettings):
     twilio_account_sid: str | None = None
     twilio_auth_token: SecretStr | None = None
     public_webhook_base_url: str | None = None
+    app_encryption_key: SecretStr | None = None
+    shopify_api_key: str | None = None
+    shopify_api_secret: SecretStr | None = None
+    shopify_app_base_url: str | None = None
+    shopify_scopes: str = "read_orders,write_orders"
+    shopify_api_version: str = "2025-07"
 
 
 @lru_cache

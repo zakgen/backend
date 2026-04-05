@@ -497,6 +497,7 @@ def build_platform_integration(
 ) -> CommerceIntegration:
     name, description = PLATFORM_CATALOG[platform_id]
     metrics = dict((connection_row or {}).get("metrics") or {})
+    config = dict((connection_row or {}).get("config") or {})
     return CommerceIntegration(
         id=platform_id,  # type: ignore[arg-type]
         name=name,
@@ -504,6 +505,10 @@ def build_platform_integration(
         status=(connection_row or {}).get("status") or "disconnected",
         imported_products=int(metrics.get("imported_products") or 0),
         last_sync_at=to_iso((connection_row or {}).get("last_synced_at")),
+        shop_domain=str(config.get("shop_domain") or "") or None,
+        last_activity_at=to_iso((connection_row or {}).get("last_activity_at")),
+        last_sync_back_at=to_iso(config.get("last_sync_back_at")),
+        webhook_status=str(config.get("webhook_status") or "") or None,
     )
 
 

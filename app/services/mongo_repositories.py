@@ -882,6 +882,22 @@ class MongoIntegrationRepository:
         matches = _sorted_desc(matches)
         return _copy_doc(matches[0])
 
+    async def find_shopify_connection(self, *, shop_domain: str) -> dict[str, Any] | None:
+        normalized_shop = shop_domain.strip().lower()
+        rows = await self.db.integration_connections.find(
+            {"integration_type": "shopify"}
+        ).to_list(length=None)
+        matches = [
+            row
+            for row in rows
+            if str(dict(row.get("config") or {}).get("shop_domain") or "").strip().lower()
+            == normalized_shop
+        ]
+        if not matches:
+            return None
+        matches = _sorted_desc(matches)
+        return _copy_doc(matches[0])
+
     async def increment_whatsapp_metrics(
         self,
         business_id: int,

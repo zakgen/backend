@@ -28,6 +28,10 @@ class CommerceIntegration(BaseModel):
     status: IntegrationStatus
     imported_products: int
     last_sync_at: str | None = None
+    shop_domain: str | None = None
+    last_activity_at: str | None = None
+    last_sync_back_at: str | None = None
+    webhook_status: str | None = None
 
 
 class ComingSoonIntegration(BaseModel):

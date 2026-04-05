@@ -102,6 +102,19 @@ class MongoOrderRepository:
             )
         return row
 
+    async def get_by_external_reference(
+        self, *, business_id: int, source_store: str, external_order_id: str
+    ) -> dict[str, Any] | None:
+        return _copy_doc(
+            await self.db.orders.find_one(
+                {
+                    "business_id": business_id,
+                    "source_store": source_store,
+                    "external_order_id": external_order_id,
+                }
+            )
+        )
+
     async def update_order_status(
         self,
         *,

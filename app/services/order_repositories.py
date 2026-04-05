@@ -100,6 +100,32 @@ class OrderRepository:
             )
         return dict(row)
 
+    async def get_by_external_reference(
+        self, *, business_id: int, source_store: str, external_order_id: str
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, source_store, external_order_id, customer_name,
+                       customer_phone, preferred_language, total_amount, currency,
+                       payment_method, delivery_city, delivery_address, order_notes,
+                       items, metadata, raw_payload, status, confirmation_status,
+                       created_at, updated_at
+                FROM orders
+                WHERE business_id = :business_id
+                  AND source_store = :source_store
+                  AND external_order_id = :external_order_id
+                """
+            ),
+            {
+                "business_id": business_id,
+                "source_store": source_store,
+                "external_order_id": external_order_id,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row is not None else None
+
     async def update_order_status(
         self,
         *,

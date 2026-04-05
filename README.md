@@ -22,6 +22,7 @@ ZakBot is a production-minded FastAPI backend that gives an n8n workflow busines
 - Exposes dashboard-oriented business, product, chat, integration, and sync-status routes
 - Supports provider-agnostic messaging with a Twilio WhatsApp implementation
 - Supports WhatsApp-first order confirmation sessions triggered from store order ingestion
+- Supports a first Shopify orders-only integration with OAuth, order webhooks, and Shopify sync-back
 - Returns stable JSON for n8n consumption
 
 ## Order confirmation v1
@@ -46,6 +47,29 @@ Current v1 scope:
 - store order ingestion is generic API-based for now
 - provider-specific Shopify/WooCommerce onboarding is intentionally deferred
 - free-text replies outside the confirmation flow are escalated to a human instead of pretending to manage the whole order conversationally
+
+## Shopify integration v1
+
+The backend now supports a first real Shopify connection flow focused on order confirmation.
+
+What it does:
+
+- starts Shopify OAuth from ZakBot
+- stores the Shopify offline token in encrypted form inside the existing integration connection
+- registers Shopify webhooks for:
+  - `orders/create`
+  - `orders/updated`
+  - `app/uninstalled`
+- normalizes Shopify orders into the current internal order-confirmation ingestion flow
+- syncs ZakBot confirmation outcomes back to Shopify using order tags and note updates
+
+Main Shopify endpoints:
+
+- `GET /business/{business_id}/integrations/shopify/connect`
+- `GET /integrations/shopify/callback`
+- `POST /webhooks/shopify/orders/create`
+- `POST /webhooks/shopify/orders/updated`
+- `POST /webhooks/shopify/app/uninstalled`
 
 Main endpoints:
 
@@ -106,6 +130,12 @@ Copy `.env.example` to `.env` and fill in:
 - `TWILIO_ACCOUNT_SID`: Master Twilio account SID used to create/manage subaccounts
 - `TWILIO_AUTH_TOKEN`: Master Twilio auth token
 - `PUBLIC_WEBHOOK_BASE_URL`: Public base URL used to build Twilio status callback URLs
+- `APP_ENCRYPTION_KEY`: Secret used to encrypt Shopify offline tokens and OAuth state
+- `SHOPIFY_API_KEY`: Shopify app client id
+- `SHOPIFY_API_SECRET`: Shopify app client secret
+- `SHOPIFY_APP_BASE_URL`: Public backend base URL used for Shopify callback and webhook registration
+- `SHOPIFY_SCOPES`: Comma-separated Shopify app scopes, default `read_orders,write_orders`
+- `SHOPIFY_API_VERSION`: Shopify Admin API version, default `2025-07`
 
 ## MongoDB migration scaffolding
 

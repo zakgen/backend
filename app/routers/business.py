@@ -286,6 +286,11 @@ async def sync_platform_integration(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Unsupported platform {platform}.",
         )
+    if platform == "shopify":
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Use the Shopify OAuth connect flow instead of the generic platform sync route.",
+        )
 
     factory = RepositoryFactory(session)
     await factory.business().get_by_id(business_id)

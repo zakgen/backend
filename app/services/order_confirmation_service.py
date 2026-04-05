@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+import logging
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -28,6 +29,8 @@ ACTIVE_SESSION_STATUSES = {
     "edit_requested",
     "human_requested",
 }
+
+logger = logging.getLogger(__name__)
 
 
 class OrderConfirmationService:
@@ -358,6 +361,11 @@ class OrderConfirmationService:
             int(inbound_row["id"]),
             intent="autre",
             needs_human=needs_human,
+        )
+        await self._sync_shopify_confirmation_if_needed(
+            business_id=business_id,
+            order_row=order_row,
+            snapshot=snapshot,
         )
         await self._send_text(
             business_id=business_id,
@@ -713,6 +721,11 @@ class OrderConfirmationService:
             event_type=event_type,
             payload={"note": payload.note, "finalized_order": finalized_order},
         )
+        await self._sync_shopify_confirmation_if_needed(
+            business_id=business_id,
+            order_row=order_row,
+            snapshot=metadata_snapshot,
+        )
         return {
             **session_row,
             "order": order_row,
@@ -867,6 +880,34 @@ class OrderConfirmationService:
                 ),
             }
         return metadata
+
+    async def _sync_shopify_confirmation_if_needed(
+        self,
+        *,
+        business_id: int,
+        order_row: dict[str, Any],
+        snapshot: dict[str, Any],
+    ) -> None:
+        confirmation_status = str(order_row.get("confirmation_status") or "")
+        if str(order_row.get("source_store") or "") != "shopify":
+            return
+        if confirmation_status not in {"awaiting_customer", "confirmed", "declined", "human_requested"}:
+            return
+        try:
+            from app.services.shopify_service import ShopifyService
+
+            await ShopifyService(session=self.session).sync_order_confirmation_status(
+                business_id=business_id,
+                order_row=order_row,
+                snapshot=snapshot,
+                confirmation_status=confirmation_status,
+            )
+        except Exception:
+            logger.exception(
+                "Shopify confirmation sync failed for business %s order %s",
+                business_id,
+                order_row.get("id"),
+            )
 
     def _build_initial_confirmation_message(
         self,

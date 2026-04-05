@@ -1317,6 +1317,24 @@ class IntegrationRepository:
         row = result.mappings().first()
         return dict(row) if row is not None else None
 
+    async def find_shopify_connection(self, *, shop_domain: str) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, integration_type, status, health, config, metrics,
+                       last_activity_at, last_synced_at, created_at, updated_at
+                FROM integration_connections
+                WHERE integration_type = 'shopify'
+                  AND config->>'shop_domain' = :shop_domain
+                ORDER BY updated_at DESC
+                LIMIT 1
+                """
+            ),
+            {"shop_domain": shop_domain.strip().lower()},
+        )
+        row = result.mappings().first()
+        return dict(row) if row is not None else None
+
     async def increment_whatsapp_metrics(
         self,
         business_id: int,

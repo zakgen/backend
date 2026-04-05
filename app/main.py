@@ -18,6 +18,7 @@ from app.routers.messaging import router as messaging_router
 from app.routers.order_confirmations import router as order_confirmations_router
 from app.routers.products import router as products_router
 from app.routers.search import router as search_router
+from app.routers.shopify import router as shopify_router
 from app.utils.logging import setup_logging
 
 
@@ -87,6 +88,7 @@ def create_app() -> FastAPI:
     app.include_router(faqs_router)
     app.include_router(embeddings_router)
     app.include_router(search_router)
+    app.include_router(shopify_router)
     return app
 
 
