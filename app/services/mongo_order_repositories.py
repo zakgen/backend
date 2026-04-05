@@ -20,6 +20,14 @@ def _copy_doc(document: dict[str, Any] | None) -> dict[str, Any] | None:
     return copied
 
 
+def _order_document_id(*, business_id: int, source_store: str, external_order_id: str) -> str:
+    return f"order:{business_id}:{source_store}:{external_order_id}"
+
+
+def _session_document_id(*, business_id: int, order_id: int) -> str:
+    return f"order-confirmation-session:{business_id}:{order_id}"
+
+
 async def _next_sequence(db: Any, sequence_name: str) -> int:
     from pymongo import ReturnDocument
 
@@ -38,7 +46,15 @@ class MongoOrderRepository:
         self.db = session.db
 
     async def upsert_order(self, *, business_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+        from pymongo import ReturnDocument
+
         now = _utc_now()
+        normalized_phone = normalize_phone_number(payload["customer_phone"])
+        document_id = _order_document_id(
+            business_id=business_id,
+            source_store=payload["source_store"],
+            external_order_id=payload["external_order_id"],
+        )
         existing = await self.db.orders.find_one(
             {
                 "business_id": business_id,
@@ -46,16 +62,11 @@ class MongoOrderRepository:
                 "external_order_id": payload["external_order_id"],
             }
         )
-        if existing is None:
-            order_id = await _next_sequence(self.db, "orders")
-            row = {
-                "_id": order_id,
-                "id": order_id,
-                "business_id": business_id,
-                "source_store": payload["source_store"],
-                "external_order_id": payload["external_order_id"],
+        if existing is not None:
+            updated = {
+                **existing,
                 "customer_name": payload.get("customer_name"),
-                "customer_phone": normalize_phone_number(payload["customer_phone"]),
+                "customer_phone": normalized_phone,
                 "preferred_language": payload.get("preferred_language"),
                 "total_amount": payload["total_amount"],
                 "currency": payload.get("currency") or "MAD",
@@ -66,32 +77,45 @@ class MongoOrderRepository:
                 "items": payload.get("items") or [],
                 "metadata": payload.get("metadata") or {},
                 "raw_payload": payload.get("raw_payload") or {},
-                "status": payload.get("status") or "pending_confirmation",
-                "confirmation_status": payload.get("confirmation_status") or "pending_send",
-                "created_at": now,
                 "updated_at": now,
             }
-            await self.db.orders.insert_one(row)
-            return _copy_doc(row) or {}
+            await self.db.orders.replace_one({"_id": existing["_id"]}, updated)
+            return _copy_doc(updated) or {}
 
-        updated = {
-            **existing,
-            "customer_name": payload.get("customer_name"),
-            "customer_phone": normalize_phone_number(payload["customer_phone"]),
-            "preferred_language": payload.get("preferred_language"),
-            "total_amount": payload["total_amount"],
-            "currency": payload.get("currency") or "MAD",
-            "payment_method": payload.get("payment_method"),
-            "delivery_city": payload.get("delivery_city"),
-            "delivery_address": payload.get("delivery_address"),
-            "order_notes": payload.get("order_notes"),
-            "items": payload.get("items") or [],
-            "metadata": payload.get("metadata") or {},
-            "raw_payload": payload.get("raw_payload") or {},
-            "updated_at": now,
-        }
-        await self.db.orders.replace_one({"_id": existing["_id"]}, updated)
-        return _copy_doc(updated) or {}
+        order_id = await _next_sequence(self.db, "orders")
+        row = await self.db.orders.find_one_and_update(
+            {"_id": document_id},
+            {
+                "$setOnInsert": {
+                    "_id": document_id,
+                    "id": order_id,
+                    "business_id": business_id,
+                    "source_store": payload["source_store"],
+                    "external_order_id": payload["external_order_id"],
+                    "created_at": now,
+                },
+                "$set": {
+                    "customer_name": payload.get("customer_name"),
+                    "customer_phone": normalized_phone,
+                    "preferred_language": payload.get("preferred_language"),
+                    "total_amount": payload["total_amount"],
+                    "currency": payload.get("currency") or "MAD",
+                    "payment_method": payload.get("payment_method"),
+                    "delivery_city": payload.get("delivery_city"),
+                    "delivery_address": payload.get("delivery_address"),
+                    "order_notes": payload.get("order_notes"),
+                    "items": payload.get("items") or [],
+                    "metadata": payload.get("metadata") or {},
+                    "raw_payload": payload.get("raw_payload") or {},
+                    "status": payload.get("status") or "pending_confirmation",
+                    "confirmation_status": payload.get("confirmation_status") or "pending_send",
+                    "updated_at": now,
+                },
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
+        return _copy_doc(row) or {}
 
     async def get_by_id(self, business_id: int, order_id: int) -> dict[str, Any]:
         row = _copy_doc(await self.db.orders.find_one({"business_id": business_id, "id": order_id}))
@@ -185,30 +209,44 @@ class MongoOrderConfirmationRepository:
         structured_snapshot: dict[str, Any],
         last_outbound_message_sid: str | None = None,
     ) -> dict[str, Any]:
-        session_id = await _next_sequence(self.db, "order_confirmation_sessions")
+        from pymongo import ReturnDocument
+
         now = _utc_now()
-        row = {
-            "_id": session_id,
-            "id": session_id,
-            "business_id": business_id,
-            "order_id": order_id,
-            "phone": normalize_phone_number(phone),
-            "customer_name": customer_name,
-            "preferred_language": preferred_language,
-            "status": status_value,
-            "needs_human": needs_human,
-            "last_detected_intent": last_detected_intent,
-            "started_at": now,
-            "last_customer_message_at": None,
-            "confirmed_at": None,
-            "declined_at": None,
-            "expires_at": None,
-            "last_outbound_message_sid": last_outbound_message_sid,
-            "structured_snapshot": structured_snapshot,
-            "created_at": now,
-            "updated_at": now,
-        }
-        await self.db.order_confirmation_sessions.insert_one(row)
+        existing = await self.db.order_confirmation_sessions.find_one(
+            {"business_id": business_id, "order_id": order_id}
+        )
+        if existing is not None:
+            return _copy_doc(existing) or {}
+
+        session_id = await _next_sequence(self.db, "order_confirmation_sessions")
+        row = await self.db.order_confirmation_sessions.find_one_and_update(
+            {"_id": _session_document_id(business_id=business_id, order_id=order_id)},
+            {
+                "$setOnInsert": {
+                    "_id": _session_document_id(business_id=business_id, order_id=order_id),
+                    "id": session_id,
+                    "business_id": business_id,
+                    "order_id": order_id,
+                    "phone": normalize_phone_number(phone),
+                    "customer_name": customer_name,
+                    "preferred_language": preferred_language,
+                    "status": status_value,
+                    "needs_human": needs_human,
+                    "last_detected_intent": last_detected_intent,
+                    "started_at": now,
+                    "last_customer_message_at": None,
+                    "confirmed_at": None,
+                    "declined_at": None,
+                    "expires_at": None,
+                    "last_outbound_message_sid": last_outbound_message_sid,
+                    "structured_snapshot": structured_snapshot,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+            },
+            upsert=True,
+            return_document=ReturnDocument.AFTER,
+        )
         return _copy_doc(row) or {}
 
     async def get_session(self, business_id: int, session_id: int) -> dict[str, Any]:
