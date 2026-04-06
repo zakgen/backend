@@ -23,7 +23,7 @@ async def fake_current_user() -> AuthenticatedUser:
     return AuthenticatedUser(auth_user_id="user-1", email="owner@example.com")
 
 
-def test_connect_shopify_route_redirects(monkeypatch) -> None:
+def test_connect_shopify_route_returns_auth_url(monkeypatch) -> None:
     class FakeShopifyService:
         def __init__(self, *, session, **kwargs) -> None:
             self.session = session
@@ -44,6 +44,32 @@ def test_connect_shopify_route_redirects(monkeypatch) -> None:
             params={
                 "shop": "demo-shop.myshopify.com",
                 "return_to": "http://localhost:3000/integrations",
+            },
+        )
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["auth_url"].startswith("https://demo-shop.myshopify.com")
+
+
+def test_connect_shopify_route_can_still_redirect_when_requested(monkeypatch) -> None:
+    class FakeShopifyService:
+        def __init__(self, *, session, **kwargs) -> None:
+            self.session = session
+
+        async def begin_oauth_install(self, *, business_id: int, shop_domain: str, return_to: str | None = None):
+            return "https://demo-shop.myshopify.com/admin/oauth/authorize?state=abc"
+
+    app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
+    monkeypatch.setattr(shopify_router, "ShopifyService", FakeShopifyService)
+
+    with TestClient(app) as client:
+        response = client.get(
+            "/business/2/integrations/shopify/connect",
+            params={
+                "shop": "demo-shop.myshopify.com",
+                "redirect": "true",
             },
             follow_redirects=False,
         )

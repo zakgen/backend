@@ -64,3 +64,7 @@ class WhatsAppTestResponse(BaseModel):
     success: bool
     message: str
     integration: WhatsAppIntegration
+
+
+class ShopifyConnectResponse(BaseModel):
+    auth_url: str
