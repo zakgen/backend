@@ -7,6 +7,7 @@ from app.config import Settings, get_settings
 from app.services.mongo_repositories import (
     MongoAIRunRepository,
     MongoBusinessRepository,
+    MongoBusinessMembershipRepository,
     MongoChatRepository,
     MongoFAQRepository,
     MongoIntegrationRepository,
@@ -24,6 +25,7 @@ from app.services.order_repositories import (
 from app.services.repositories import (
     AIRunRepository,
     BusinessRepository,
+    BusinessMembershipRepository,
     ChatRepository,
     FAQRepository,
     IntegrationRepository,
@@ -51,6 +53,11 @@ class RepositoryFactory:
         if self._is_mongo():
             return MongoBusinessRepository(self.session)
         return BusinessRepository(self.session)
+
+    def memberships(self) -> BusinessMembershipRepository | MongoBusinessMembershipRepository:
+        if self._is_mongo():
+            return MongoBusinessMembershipRepository(self.session)
+        return BusinessMembershipRepository(self.session)
 
     def products(self) -> ProductRepository | MongoProductRepository:
         if self._is_mongo():

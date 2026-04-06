@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers import shopify as shopify_router
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.database import get_session
 
 
@@ -16,6 +17,10 @@ class DummySession:
 
 async def fake_session() -> AsyncIterator[DummySession]:
     yield DummySession()
+
+
+async def fake_current_user() -> AuthenticatedUser:
+    return AuthenticatedUser(auth_user_id="user-1", email="owner@example.com")
 
 
 def test_connect_shopify_route_redirects(monkeypatch) -> None:
@@ -30,6 +35,7 @@ def test_connect_shopify_route_redirects(monkeypatch) -> None:
             return "https://demo-shop.myshopify.com/admin/oauth/authorize?state=abc"
 
     app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
     monkeypatch.setattr(shopify_router, "ShopifyService", FakeShopifyService)
 
     with TestClient(app) as client:

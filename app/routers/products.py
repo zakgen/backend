@@ -16,6 +16,7 @@ from app.schemas.product import (
     ProductResponse,
     ProductUpsertRequest,
 )
+from app.services.auth import AuthenticatedUser, ensure_user_can_access_business, require_authenticated_user, require_business_access
 from app.services.database import get_session
 from app.services.dashboard_service import build_product_storage_payload, product_row_to_dashboard
 from app.services.embedding_service import EmbeddingService
@@ -35,6 +36,7 @@ async def list_products(
     business_id: int,
     search: str | None = None,
     category: str | None = None,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> ProductListResult:
     rows, total, categories = await RepositoryFactory(session).products().list_dashboard(
@@ -49,8 +51,15 @@ async def list_products(
 
 @router.post("/products", response_model=Product, status_code=status.HTTP_200_OK)
 async def create_product(
-    payload: DashboardProductCreateRequest, session: AsyncSession = Depends(get_session)
+    payload: DashboardProductCreateRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> Product:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=payload.business_id,
+    )
     repository = RepositoryFactory(session).products()
     product_row = await repository.create_dashboard_product(
         build_product_storage_payload(
@@ -80,10 +89,16 @@ async def create_product(
 async def update_product(
     product_id: int,
     payload: DashboardProductUpdateRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
     session: AsyncSession = Depends(get_session),
 ) -> Product:
     repository = RepositoryFactory(session).products()
     existing = await repository.get_by_product_id(product_id)
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=int(existing["business_id"]),
+    )
     updated_row = await repository.update_dashboard_product(
         product_id,
         build_product_storage_payload(
@@ -122,9 +137,18 @@ async def update_product(
 
 @router.delete("/products/{product_id}", status_code=status.HTTP_200_OK)
 async def delete_product(
-    product_id: int, session: AsyncSession = Depends(get_session)
+    product_id: int,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> dict[str, bool | str]:
-    deleted = await RepositoryFactory(session).products().delete(product_id)
+    repository = RepositoryFactory(session).products()
+    existing = await repository.get_by_product_id(product_id)
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=int(existing["business_id"]),
+    )
+    deleted = await repository.delete(product_id)
     await SyncService(session=session, embedding_service=EmbeddingService()).update_status_snapshot(
         deleted["business_id"],
         last_result="Product deleted from dashboard.",
@@ -135,8 +159,15 @@ async def delete_product(
 
 @router.post("/products/bulk", response_model=ProductListResult, status_code=status.HTTP_200_OK)
 async def bulk_create_products(
-    payload: DashboardProductBulkRequest, session: AsyncSession = Depends(get_session)
+    payload: DashboardProductBulkRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ProductListResult:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=payload.business_id,
+    )
     repository = RepositoryFactory(session).products()
     created_rows = []
     for item in payload.products:
@@ -175,8 +206,15 @@ async def bulk_create_products(
 
 @router.post("/products/upsert", response_model=ProductResponse, status_code=status.HTTP_200_OK)
 async def upsert_product(
-    payload: ProductUpsertRequest, session: AsyncSession = Depends(get_session)
+    payload: ProductUpsertRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ProductResponse:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=payload.business_id,
+    )
     repository = RepositoryFactory(session).products()
     product = await repository.upsert(payload)
 
@@ -197,8 +235,15 @@ async def upsert_product(
     status_code=status.HTTP_200_OK,
 )
 async def bulk_upsert_products(
-    payload: BulkProductUpsertRequest, session: AsyncSession = Depends(get_session)
+    payload: BulkProductUpsertRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> BulkProductUpsertResponse:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=payload.business_id,
+    )
     repository = RepositoryFactory(session).products()
     products = await repository.bulk_upsert(payload)
 

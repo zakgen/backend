@@ -21,6 +21,12 @@ from app.schemas.integration import (
     WhatsAppTestRequest,
     WhatsAppTestResponse,
 )
+from app.services.account_service import AccountService
+from app.services.auth import (
+    AuthenticatedUser,
+    ensure_user_can_access_business,
+    require_authenticated_user,
+)
 from app.services.database import get_session
 from app.services.dashboard_service import (
     PLATFORM_CATALOG,
@@ -46,8 +52,31 @@ router = APIRouter(prefix="/business", tags=["business"])
 
 @router.post("/upsert", response_model=BusinessResponse, status_code=status.HTTP_200_OK)
 async def upsert_business(
-    payload: BusinessUpsertRequest, session: AsyncSession = Depends(get_session)
+    payload: BusinessUpsertRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> BusinessResponse:
+    if payload.id is None:
+        business = await AccountService(session=session).create_business(
+            current_user=current_user,
+            payload=BusinessUpsertRequest(
+                name=payload.name,
+                description=payload.description,
+                city=payload.city,
+                shipping_policy=payload.shipping_policy,
+                delivery_zones=payload.delivery_zones,
+                payment_methods=payload.payment_methods,
+                profile_metadata=payload.profile_metadata,
+            ),
+        )
+        await session.commit()
+        return BusinessResponse.model_validate(business)
+
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=int(payload.id),
+    )
     repository = RepositoryFactory(session).business()
     record = await repository.upsert(payload)
 
@@ -64,8 +93,15 @@ async def upsert_business(
 
 @router.get("/{business_id}", response_model=BusinessProfile, status_code=status.HTTP_200_OK)
 async def get_business_profile(
-    business_id: int, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> BusinessProfile:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     business_repository = factory.business()
     faq_repository = factory.faqs()
@@ -78,8 +114,14 @@ async def get_business_profile(
 async def update_business_profile(
     business_id: int,
     payload: BusinessProfileUpdateRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
     session: AsyncSession = Depends(get_session),
 ) -> BusinessProfile:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     business_repository = factory.business()
     faq_repository = factory.faqs()
@@ -121,8 +163,14 @@ async def list_business_chats(
     intent: str | None = Query(default=None),
     direction: str | None = Query(default=None),
     needs_human: bool | None = Query(default=None),
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
     session: AsyncSession = Depends(get_session),
 ) -> list[ConversationSummary]:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     await factory.business().get_by_id(business_id)
     rows = await factory.chats().list_messages(
@@ -141,8 +189,16 @@ async def list_business_chats(
     status_code=status.HTTP_200_OK,
 )
 async def get_business_chat_thread(
-    business_id: int, phone: str, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    phone: str,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> ConversationThread:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     await factory.business().get_by_id(business_id)
     rows = await factory.chats().get_thread(business_id, phone)
@@ -160,8 +216,15 @@ async def get_business_chat_thread(
     status_code=status.HTTP_200_OK,
 )
 async def get_business_overview(
-    business_id: int, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> OverviewData:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     business_repository = factory.business()
     faq_repository = factory.faqs()
@@ -214,8 +277,15 @@ async def get_business_overview(
     status_code=status.HTTP_200_OK,
 )
 async def get_business_integrations(
-    business_id: int, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> IntegrationsData:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     factory = RepositoryFactory(session)
     business_repository = factory.business()
     product_repository = factory.products()
@@ -251,8 +321,14 @@ async def get_business_integrations(
 async def connect_whatsapp(
     business_id: int,
     payload: WhatsAppConnectRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppIntegration:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     service = MessagingService(session=session, provider=TwilioMessagingProvider())
     connection = await service.begin_whatsapp_connection(business_id, payload)
     await session.commit()
@@ -265,8 +341,15 @@ async def connect_whatsapp(
     status_code=status.HTTP_200_OK,
 )
 async def disconnect_whatsapp(
-    business_id: int, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> WhatsAppIntegration:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     service = MessagingService(session=session, provider=TwilioMessagingProvider())
     connection = await service.disconnect_whatsapp(business_id)
     await session.commit()
@@ -279,8 +362,16 @@ async def disconnect_whatsapp(
     status_code=status.HTTP_200_OK,
 )
 async def sync_platform_integration(
-    business_id: int, platform: str, session: AsyncSession = Depends(get_session)
+    business_id: int,
+    platform: str,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
+    session: AsyncSession = Depends(get_session),
 ) -> CommerceIntegration:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     if platform not in PLATFORM_CATALOG:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -329,8 +420,14 @@ async def sync_platform_integration(
 async def test_whatsapp_integration(
     business_id: int,
     payload: WhatsAppTestRequest,
+    current_user: AuthenticatedUser = Depends(require_authenticated_user),
     session: AsyncSession = Depends(get_session),
 ) -> WhatsAppTestResponse:
+    await ensure_user_can_access_business(
+        session=session,
+        current_user=current_user,
+        business_id=business_id,
+    )
     integration = await MessagingService(
         session=session, provider=TwilioMessagingProvider()
     ).test_whatsapp(business_id)

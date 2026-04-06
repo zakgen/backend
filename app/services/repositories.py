@@ -222,6 +222,138 @@ class BusinessRepository:
         return [dict(row) for row in result.mappings().all()]
 
 
+class BusinessMembershipRepository:
+    _BUSINESS_COLUMNS = """
+        b.id, b.name, b.description, b.city, b.shipping_policy,
+        b.delivery_zones, b.payment_methods, b.profile_metadata,
+        b.created_at, b.updated_at
+    """
+
+    def __init__(self, session: AsyncSession) -> None:
+        self.session = session
+
+    async def count_businesses_for_user(self, auth_user_id: str) -> int:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM business_memberships
+                WHERE auth_user_id = :auth_user_id
+                """
+            ),
+            {"auth_user_id": auth_user_id},
+        )
+        return int(result.scalar_one())
+
+    async def upsert_membership(
+        self,
+        *,
+        auth_user_id: str,
+        email: str | None,
+        business_id: int,
+        role: str,
+        is_default: bool,
+    ) -> dict[str, Any]:
+        if is_default:
+            await self.session.execute(
+                text(
+                    """
+                    UPDATE business_memberships
+                    SET is_default = FALSE,
+                        updated_at = timezone('utc', now())
+                    WHERE auth_user_id = :auth_user_id
+                    """
+                ),
+                {"auth_user_id": auth_user_id},
+            )
+        result = await self.session.execute(
+            text(
+                """
+                INSERT INTO business_memberships (
+                    auth_user_id, email, business_id, role, is_default
+                )
+                VALUES (
+                    :auth_user_id, :email, :business_id, :role, :is_default
+                )
+                ON CONFLICT (auth_user_id, business_id)
+                DO UPDATE SET
+                    email = COALESCE(EXCLUDED.email, business_memberships.email),
+                    role = EXCLUDED.role,
+                    is_default = EXCLUDED.is_default,
+                    updated_at = timezone('utc', now())
+                RETURNING id, auth_user_id, email, business_id, role, is_default, created_at, updated_at
+                """
+            ),
+            {
+                "auth_user_id": auth_user_id,
+                "email": email,
+                "business_id": business_id,
+                "role": role,
+                "is_default": is_default,
+            },
+        )
+        return dict(result.mappings().one())
+
+    async def require_business_access(self, *, auth_user_id: str, business_id: int) -> dict[str, Any]:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, auth_user_id, email, business_id, role, is_default, created_at, updated_at
+                FROM business_memberships
+                WHERE auth_user_id = :auth_user_id
+                  AND business_id = :business_id
+                """
+            ),
+            {
+                "auth_user_id": auth_user_id,
+                "business_id": business_id,
+            },
+        )
+        row = result.mappings().first()
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this business.",
+            )
+        return dict(row)
+
+    async def list_businesses_for_user(self, auth_user_id: str) -> list[dict[str, Any]]:
+        result = await self.session.execute(
+            text(
+                f"""
+                SELECT {self._BUSINESS_COLUMNS},
+                       m.role,
+                       m.is_default
+                FROM business_memberships m
+                JOIN business b ON b.id = m.business_id
+                WHERE m.auth_user_id = :auth_user_id
+                ORDER BY m.is_default DESC, m.created_at ASC, b.id ASC
+                """
+            ),
+            {"auth_user_id": auth_user_id},
+        )
+        return [dict(row) for row in result.mappings().all()]
+
+    async def get_current_business_for_user(self, auth_user_id: str) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                f"""
+                SELECT {self._BUSINESS_COLUMNS},
+                       m.role,
+                       m.is_default
+                FROM business_memberships m
+                JOIN business b ON b.id = m.business_id
+                WHERE m.auth_user_id = :auth_user_id
+                ORDER BY m.is_default DESC, m.created_at ASC, b.id ASC
+                LIMIT 1
+                """
+            ),
+            {"auth_user_id": auth_user_id},
+        )
+        row = result.mappings().first()
+        return dict(row) if row is not None else None
+
+
 class ProductRepository:
     def __init__(self, session: AsyncSession) -> None:
         self.session = session

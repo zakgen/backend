@@ -5,6 +5,7 @@ from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.conversation import ConversationMessage, ConversationReplyRequest
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.database import get_session
 from app.services.dashboard_service import chat_row_to_message
 from app.services.messaging_service import MessagingService
@@ -31,6 +32,7 @@ async def reply_to_chat(
     business_id: int,
     phone: str,
     payload: ConversationReplyRequest,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> ConversationMessage:
     service = MessagingService(session=session, provider=TwilioMessagingProvider())

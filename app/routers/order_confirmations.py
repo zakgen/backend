@@ -12,6 +12,7 @@ from app.schemas.order_confirmation import (
     OrderRecord,
     StoreOrderIngestRequest,
 )
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.database import get_session
 from app.services.dashboard_service import to_iso
 from app.services.order_confirmation_service import OrderConfirmationService
@@ -96,6 +97,7 @@ def _serialize_session_detail(row: dict) -> OrderConfirmationSessionDetail:
 async def ingest_store_order(
     business_id: int,
     payload: StoreOrderIngestRequest,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> OrderConfirmationIngestResponse:
     service = OrderConfirmationService(
@@ -121,6 +123,7 @@ async def list_order_confirmation_sessions(
     business_id: int,
     status_value: str | None = Query(default=None, alias="status"),
     limit: int = Query(default=50, ge=1, le=200),
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> OrderConfirmationSessionListResponse:
     service = OrderConfirmationService(
@@ -142,6 +145,7 @@ async def list_order_confirmation_sessions(
 async def get_order_confirmation_session(
     business_id: int,
     session_id: int,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> OrderConfirmationSessionDetail:
     service = OrderConfirmationService(
@@ -161,6 +165,7 @@ async def apply_order_confirmation_action(
     business_id: int,
     session_id: int,
     payload: OrderConfirmationActionRequest,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> OrderConfirmationSessionDetail:
     service = OrderConfirmationService(

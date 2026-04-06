@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.routers import order_confirmations as order_confirmations_router
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.database import get_session
 
 
@@ -16,6 +17,10 @@ class DummySession:
 
 async def fake_session() -> AsyncIterator[DummySession]:
     yield DummySession()
+
+
+async def fake_current_user() -> AuthenticatedUser:
+    return AuthenticatedUser(auth_user_id="user-1", email="owner@example.com")
 
 
 def _detail_payload() -> dict:
@@ -77,6 +82,7 @@ def test_ingest_order_route_returns_session(monkeypatch) -> None:
             return _detail_payload()
 
     app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
     monkeypatch.setattr(
         order_confirmations_router,
         "OrderConfirmationService",
@@ -117,6 +123,7 @@ def test_list_sessions_route_returns_rows(monkeypatch) -> None:
             return [_detail_payload()]
 
     app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
     monkeypatch.setattr(
         order_confirmations_router,
         "OrderConfirmationService",
@@ -144,6 +151,7 @@ def test_apply_action_route_returns_detail(monkeypatch) -> None:
             return detail
 
     app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
     monkeypatch.setattr(
         order_confirmations_router,
         "OrderConfirmationService",
@@ -159,4 +167,3 @@ def test_apply_action_route_returns_detail(monkeypatch) -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json()["status"] == "confirmed"
-

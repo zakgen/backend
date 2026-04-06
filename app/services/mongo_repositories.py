@@ -199,6 +199,100 @@ class MongoBusinessRepository:
         return scored[:limit]
 
 
+class MongoBusinessMembershipRepository:
+    def __init__(self, session: Any) -> None:
+        self.session = session
+        self.db = session.db
+
+    async def count_businesses_for_user(self, auth_user_id: str) -> int:
+        return int(
+            await self.db.business_memberships.count_documents({"auth_user_id": auth_user_id})
+        )
+
+    async def upsert_membership(
+        self,
+        *,
+        auth_user_id: str,
+        email: str | None,
+        business_id: int,
+        role: str,
+        is_default: bool,
+    ) -> dict[str, Any]:
+        if is_default:
+            await self.db.business_memberships.update_many(
+                {"auth_user_id": auth_user_id},
+                {"$set": {"is_default": False, "updated_at": _utc_now()}},
+            )
+        now = _utc_now()
+        document_id = f"business-membership:{auth_user_id}:{business_id}"
+        existing = await self.db.business_memberships.find_one({"_id": document_id})
+        if existing is None:
+            membership_id = await _next_sequence(self.db, "business_memberships")
+            row = {
+                "_id": document_id,
+                "id": membership_id,
+                "auth_user_id": auth_user_id,
+                "email": email,
+                "business_id": business_id,
+                "role": role,
+                "is_default": is_default,
+                "created_at": now,
+                "updated_at": now,
+            }
+            await self.db.business_memberships.insert_one(row)
+            return _copy_doc(row) or {}
+
+        updated = {
+            **existing,
+            "email": email or existing.get("email"),
+            "role": role,
+            "is_default": is_default,
+            "updated_at": now,
+        }
+        await self.db.business_memberships.replace_one({"_id": existing["_id"]}, updated)
+        return _copy_doc(updated) or {}
+
+    async def require_business_access(self, *, auth_user_id: str, business_id: int) -> dict[str, Any]:
+        row = _copy_doc(
+            await self.db.business_memberships.find_one(
+                {"auth_user_id": auth_user_id, "business_id": business_id}
+            )
+        )
+        if row is None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have access to this business.",
+            )
+        return row
+
+    async def list_businesses_for_user(self, auth_user_id: str) -> list[dict[str, Any]]:
+        memberships = await self.db.business_memberships.find(
+            {"auth_user_id": auth_user_id}
+        ).to_list(length=None)
+        memberships.sort(
+            key=lambda row: (
+                not bool(row.get("is_default")),
+                row.get("created_at") or datetime.min.replace(tzinfo=UTC),
+                row.get("business_id", 0),
+            )
+        )
+        businesses: list[dict[str, Any]] = []
+        for membership in memberships:
+            business = _copy_doc(
+                await self.db.business.find_one({"id": int(membership["business_id"])})
+            )
+            if business is None:
+                continue
+            business["role"] = membership.get("role")
+            business["is_default"] = bool(membership.get("is_default"))
+            businesses.append(business)
+        return businesses
+
+    async def get_current_business_for_user(self, auth_user_id: str) -> dict[str, Any] | None:
+        businesses = await self.list_businesses_for_user(auth_user_id)
+        return businesses[0] if businesses else None
+
+
 class MongoProductRepository:
     def __init__(self, session: Any) -> None:
         self.session = session

@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import get_settings
+from app.routers.account import router as account_router
 from app.routers.ai import router as ai_router
 from app.routers.business import router as business_router
 from app.routers.embeddings import router as embeddings_router
@@ -80,6 +81,7 @@ def create_app() -> FastAPI:
         )
 
     app.include_router(health_router)
+    app.include_router(account_router)
     app.include_router(business_router)
     app.include_router(ai_router)
     app.include_router(messaging_router)

@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.database import get_session
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.shopify_service import ShopifyService
 
 
@@ -19,6 +20,7 @@ async def connect_shopify(
     business_id: int,
     shop: str = Query(..., min_length=3),
     return_to: str | None = Query(default=None),
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> RedirectResponse:
     auth_url = await ShopifyService(session=session).begin_oauth_install(

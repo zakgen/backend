@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.ai import AIReplyRequest, AIReplyResponse, AIRunDetail, AIRunSummary
+from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.ai_reply_service import AIReplyService
 from app.services.database import get_session
 
@@ -19,6 +20,7 @@ router = APIRouter(prefix="/business", tags=["ai"])
 async def generate_ai_reply(
     business_id: int,
     payload: AIReplyRequest,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> AIReplyResponse:
     service = AIReplyService(session=session)
@@ -35,6 +37,7 @@ async def generate_ai_reply(
 async def list_ai_runs(
     business_id: int,
     limit: int = Query(default=50, ge=1, le=200),
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> list[AIRunSummary]:
     service = AIReplyService(session=session)
@@ -49,6 +52,7 @@ async def list_ai_runs(
 async def get_ai_run(
     business_id: int,
     run_id: int,
+    current_user: AuthenticatedUser = Depends(require_business_access),
     session: AsyncSession = Depends(get_session),
 ) -> AIRunDetail:
     service = AIReplyService(session=session)
