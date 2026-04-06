@@ -733,22 +733,69 @@ class ShopifyService:
     ) -> dict[str, int]:
         subscription_ids: dict[str, int] = {}
         for topic, path in WEBHOOK_TOPICS.items():
+            address = f"{self._public_base_url().rstrip('/')}{path}"
             response = await self.http_client.post(
                 f"https://{shop_domain}/admin/api/{self.settings.shopify_api_version}/webhooks.json",
                 headers={"X-Shopify-Access-Token": access_token},
                 json={
                     "webhook": {
                         "topic": topic,
-                        "address": f"{self._public_base_url().rstrip('/')}{path}",
+                        "address": address,
                         "format": "json",
                     }
                 },
             )
+            if response.status_code == 422:
+                existing_id = await self._find_existing_webhook_id(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                    topic=topic,
+                    address=address,
+                )
+                if existing_id is not None:
+                    logger.info(
+                        "Reusing existing Shopify webhook subscription shop=%s topic=%s webhook_id=%s",
+                        shop_domain,
+                        topic,
+                        existing_id,
+                    )
+                    subscription_ids[topic] = existing_id
+                    continue
+                logger.error(
+                    "Shopify webhook registration failed with 422 shop=%s topic=%s address=%s body=%s",
+                    shop_domain,
+                    topic,
+                    address,
+                    response.text,
+                )
             response.raise_for_status()
             payload = response.json()
             webhook = dict(payload.get("webhook") or {})
             subscription_ids[topic] = int(webhook.get("id") or 0)
         return subscription_ids
+
+    async def _find_existing_webhook_id(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        topic: str,
+        address: str,
+    ) -> int | None:
+        response = await self.http_client.get(
+            f"https://{shop_domain}/admin/api/{self.settings.shopify_api_version}/webhooks.json",
+            headers={"X-Shopify-Access-Token": access_token},
+        )
+        response.raise_for_status()
+        payload = response.json()
+        for row in payload.get("webhooks") or []:
+            webhook = dict(row or {})
+            if (
+                str(webhook.get("topic") or "").strip() == topic
+                and str(webhook.get("address") or "").strip().rstrip("/") == address.rstrip("/")
+            ):
+                return int(webhook.get("id") or 0)
+        return None
 
     async def _touch_shopify_connection(
         self,

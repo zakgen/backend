@@ -185,6 +185,111 @@ def test_handle_oauth_callback_stores_connection_and_registers_webhooks() -> Non
     assert config["webhook_subscription_ids"]["orders/create"] == 101
 
 
+def test_handle_oauth_callback_reuses_existing_webhooks_on_422() -> None:
+    http_client = FakeHTTPClient()
+    http_client.post_responses = [
+        httpx.Response(200, json={"access_token": "shpat_123", "scope": "read_orders,write_orders"}),
+        httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
+        httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
+        httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
+    ]
+    http_client.get_responses = [
+        httpx.Response(200, json={"shop": {"id": 77, "name": "Demo Shop"}}),
+        httpx.Response(
+            200,
+            json={
+                "webhooks": [
+                    {
+                        "id": 101,
+                        "topic": "orders/create",
+                        "address": "https://api.example.com/webhooks/shopify/orders/create",
+                    },
+                    {
+                        "id": 102,
+                        "topic": "orders/updated",
+                        "address": "https://api.example.com/webhooks/shopify/orders/updated",
+                    },
+                    {
+                        "id": 103,
+                        "topic": "app/uninstalled",
+                        "address": "https://api.example.com/webhooks/shopify/app/uninstalled",
+                    },
+                ]
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "webhooks": [
+                    {
+                        "id": 101,
+                        "topic": "orders/create",
+                        "address": "https://api.example.com/webhooks/shopify/orders/create",
+                    },
+                    {
+                        "id": 102,
+                        "topic": "orders/updated",
+                        "address": "https://api.example.com/webhooks/shopify/orders/updated",
+                    },
+                    {
+                        "id": 103,
+                        "topic": "app/uninstalled",
+                        "address": "https://api.example.com/webhooks/shopify/app/uninstalled",
+                    },
+                ]
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "webhooks": [
+                    {
+                        "id": 101,
+                        "topic": "orders/create",
+                        "address": "https://api.example.com/webhooks/shopify/orders/create",
+                    },
+                    {
+                        "id": 102,
+                        "topic": "orders/updated",
+                        "address": "https://api.example.com/webhooks/shopify/orders/updated",
+                    },
+                    {
+                        "id": 103,
+                        "topic": "app/uninstalled",
+                        "address": "https://api.example.com/webhooks/shopify/app/uninstalled",
+                    },
+                ]
+            },
+        ),
+    ]
+    service, integration_repository, _ = _service(http_client)
+    state = service.crypto_service.encrypt_json(
+        {
+            "business_id": 2,
+            "shop_domain": "demo-shop.myshopify.com",
+            "return_to": "http://localhost:3000/integrations",
+        }
+    )
+    params = {
+        "code": "auth-code",
+        "shop": "demo-shop.myshopify.com",
+        "state": state,
+        "timestamp": "1712230000",
+    }
+    params["hmac"] = _oauth_hmac("shopify-secret", params)
+
+    import asyncio
+
+    redirect_url = asyncio.run(service.handle_oauth_callback(params))
+
+    assert redirect_url.startswith("http://localhost:3000/integrations")
+    assert integration_repository.connection is not None
+    config = integration_repository.connection["config"]
+    assert config["webhook_subscription_ids"]["orders/create"] == 101
+    assert config["webhook_subscription_ids"]["orders/updated"] == 102
+    assert config["webhook_subscription_ids"]["app/uninstalled"] == 103
+
+
 def test_orders_create_webhook_is_idempotent_on_duplicate_event(monkeypatch) -> None:
     service, integration_repository, _ = _service()
     integration_repository.connection = {
