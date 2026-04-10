@@ -15,11 +15,14 @@ from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import Settings, get_settings
+from app.schemas.product import BulkProductUpsertRequest, ProductBulkItem
 from app.schemas.order_confirmation import StoreOrderIngestRequest
 from app.services.crypto_service import AppCryptoService
 from app.services.dashboard_service import to_iso
+from app.services.embedding_service import EmbeddingService
 from app.services.order_confirmation_service import OrderConfirmationService
 from app.services.repository_factory import RepositoryFactory
+from app.services.sync_service import SyncService
 from app.services.twilio_provider import TwilioMessagingProvider
 
 
@@ -49,6 +52,7 @@ class ShopifyService:
         factory = RepositoryFactory(session, self.settings)
         self.business_repository = factory.business()
         self.integration_repository = factory.integrations()
+        self.product_repository = factory.products()
         self.order_repository = factory.orders()
         self.order_confirmation_repository = factory.order_confirmations()
 
@@ -135,6 +139,7 @@ class ShopifyService:
                 "scopes": scopes,
                 "shop_id": shop_info.get("id"),
                 "shop_name": shop_info.get("name"),
+                "shop_currency": shop_info.get("currency"),
                 "install_status": "connected",
                 "oauth_completed_at": to_iso(datetime.now(UTC)),
                 "webhook_status": "connected",
@@ -162,6 +167,119 @@ class ShopifyService:
             business_id=business_id,
             shop_domain=shop_domain,
         )
+
+    async def import_products(self, *, business_id: int) -> dict[str, Any]:
+        connection = await self.integration_repository.get_connection(business_id, "shopify")
+        if connection is None or str(connection.get("status") or "") != "connected":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify must be connected before importing products.",
+            )
+
+        config = dict(connection.get("config") or {})
+        shop_domain = str(config.get("shop_domain") or "").strip()
+        encrypted_token = str(config.get("offline_access_token_encrypted") or "").strip()
+        if not shop_domain or not encrypted_token:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify connection is missing shop credentials. Reconnect Shopify and try again.",
+            )
+
+        scopes = self._normalize_scopes(config.get("scopes"))
+        if "read_products" not in scopes:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Shopify product import requires the read_products scope. Reconnect Shopify and try again.",
+            )
+
+        try:
+            access_token = self.crypto_service.decrypt_text(encrypted_token)
+            shop_currency = str(config.get("shop_currency") or "").strip() or None
+            if shop_currency is None:
+                shop_info = await self._fetch_shop_info(
+                    shop_domain=shop_domain,
+                    access_token=access_token,
+                )
+                shop_currency = str(shop_info.get("currency") or "").strip() or None
+                if shop_currency is not None:
+                    config["shop_currency"] = shop_currency
+
+            imported_at = to_iso(datetime.now(UTC)) or ""
+            products = await self._fetch_shopify_products(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                shop_currency=shop_currency,
+                imported_at=imported_at,
+            )
+            sync_service = SyncService(
+                session=self.session,
+                embedding_service=EmbeddingService(),
+            )
+            product_ids: list[int] = []
+            if products:
+                upserted = await self.product_repository.bulk_upsert(
+                    BulkProductUpsertRequest(
+                        business_id=business_id,
+                        products=products,
+                    )
+                )
+                product_ids = [int(product["id"]) for product in upserted]
+                await sync_service.sync_products(business_id, product_ids=product_ids)
+            await sync_service.update_status_snapshot(
+                business_id,
+                last_result="Shopify product import completed successfully.",
+            )
+
+            config["last_product_import_at"] = imported_at
+            config["last_product_import_status"] = "success"
+            config["last_product_import_error"] = None
+            updated_connection = await self.integration_repository.upsert_connection(
+                business_id=business_id,
+                integration_type="shopify",
+                status_value=str(connection["status"]),
+                health="healthy",
+                config=config,
+                metrics={
+                    **dict(connection.get("metrics") or {}),
+                    "imported_products": len(products),
+                },
+                last_activity_at=datetime.now(UTC),
+                last_synced_at=datetime.now(UTC),
+            )
+            return {
+                "business_id": business_id,
+                "shop_domain": shop_domain,
+                "fetched_products": len(products),
+                "imported_products": int(
+                    dict(updated_connection.get("metrics") or {}).get("imported_products") or 0
+                ),
+                "product_ids": product_ids,
+                "last_product_import_at": imported_at,
+                "last_product_import_status": "success",
+            }
+        except HTTPException:
+            raise
+        except Exception as exc:
+            logger.exception(
+                "Shopify product import failed for business %s shop %s",
+                business_id,
+                shop_domain,
+                exc_info=exc,
+            )
+            config["last_product_import_at"] = to_iso(datetime.now(UTC))
+            config["last_product_import_status"] = "failed"
+            config["last_product_import_error"] = str(exc)
+            await self.integration_repository.upsert_connection(
+                business_id=business_id,
+                integration_type="shopify",
+                status_value=str(connection["status"]),
+                health="attention",
+                config=config,
+                metrics=dict(connection.get("metrics") or {}),
+                last_activity_at=connection.get("last_activity_at"),
+                last_synced_at=connection.get("last_synced_at"),
+            )
+            raise
 
     async def handle_orders_create(
         self,
@@ -452,6 +570,143 @@ class ShopifyService:
             return True
         return False
 
+    async def _fetch_shopify_products(
+        self,
+        *,
+        shop_domain: str,
+        access_token: str,
+        shop_currency: str | None,
+        imported_at: str,
+    ) -> list[ProductBulkItem]:
+        cursor: str | None = None
+        products: list[ProductBulkItem] = []
+        while True:
+            response = await self._shopify_graphql(
+                shop_domain=shop_domain,
+                access_token=access_token,
+                query="""
+                    query FetchProducts($cursor: String) {
+                      products(first: 100, after: $cursor, sortKey: UPDATED_AT) {
+                        pageInfo {
+                          hasNextPage
+                          endCursor
+                        }
+                        nodes {
+                          id
+                          legacyResourceId
+                          title
+                          description
+                          productType
+                          tags
+                          status
+                          vendor
+                          variants(first: 100) {
+                            nodes {
+                              id
+                              legacyResourceId
+                              title
+                              sku
+                              price
+                              availableForSale
+                            }
+                          }
+                        }
+                      }
+                    }
+                """,
+                variables={"cursor": cursor},
+            )
+            product_connection = dict(response.get("products") or {})
+            for row in product_connection.get("nodes") or []:
+                product = self._map_shopify_product_to_product_item(
+                    dict(row or {}),
+                    shop_currency=shop_currency,
+                    imported_at=imported_at,
+                )
+                if product is not None:
+                    products.append(product)
+            page_info = dict(product_connection.get("pageInfo") or {})
+            if not page_info.get("hasNextPage"):
+                break
+            cursor = str(page_info.get("endCursor") or "").strip() or None
+            if cursor is None:
+                break
+        return products
+
+    def _map_shopify_product_to_product_item(
+        self,
+        product: dict[str, Any],
+        *,
+        shop_currency: str | None,
+        imported_at: str,
+    ) -> ProductBulkItem | None:
+        legacy_id = str(product.get("legacyResourceId") or "").strip()
+        graphql_id = str(product.get("id") or "").strip()
+        external_id = legacy_id or graphql_id
+        if not external_id:
+            return None
+
+        raw_variants = [
+            dict(row or {})
+            for row in dict(product.get("variants") or {}).get("nodes") or []
+        ]
+        variant_prices = [
+            self._to_float(variant.get("price"))
+            for variant in raw_variants
+            if self._to_float(variant.get("price")) is not None
+        ]
+        base_price = min(variant_prices) if variant_prices else None
+        variants: list[dict[str, Any]] = []
+        has_available_variant = False
+        for index, variant in enumerate(raw_variants, start=1):
+            variant_price = self._to_float(variant.get("price"))
+            if bool(variant.get("availableForSale")):
+                has_available_variant = True
+            additional_price = None
+            if variant_price is not None and base_price is not None:
+                additional_price = round(variant_price - base_price, 2)
+            variants.append(
+                {
+                    "id": str(
+                        variant.get("legacyResourceId")
+                        or variant.get("id")
+                        or f"variant-{index}"
+                    ),
+                    "name": str(variant.get("title") or f"Variant {index}"),
+                    "additional_price": additional_price,
+                    "stock_status": "in_stock"
+                    if bool(variant.get("availableForSale"))
+                    else "out_of_stock",
+                }
+            )
+
+        product_status = str(product.get("status") or "").strip().upper()
+        availability = (
+            "in_stock" if product_status == "ACTIVE" and has_available_variant else "out_of_stock"
+        )
+        return ProductBulkItem(
+            external_id=external_id,
+            name=str(product.get("title") or "Product"),
+            description=str(product.get("description") or ""),
+            price=base_price,
+            currency=shop_currency or "MAD",
+            category=str(product.get("productType") or "").strip() or None,
+            availability=availability,
+            variants=variants,
+            tags=[
+                str(tag).strip()
+                for tag in product.get("tags") or []
+                if str(tag).strip()
+            ],
+            metadata={
+                "source_platform": "shopify",
+                "shopify_product_gid": graphql_id or None,
+                "vendor": str(product.get("vendor") or "").strip() or None,
+                "shopify_status": product_status or None,
+                "shopify_last_synced_at": imported_at,
+            },
+        )
+
     def _map_shopify_order_to_ingest(
         self, payload: dict[str, Any]
     ) -> StoreOrderIngestRequest | None:
@@ -518,6 +773,23 @@ class ShopifyService:
             raw_payload=payload,
             send_confirmation=True,
         )
+
+    def _normalize_scopes(self, raw_scopes: Any) -> set[str]:
+        if isinstance(raw_scopes, list):
+            return {str(scope).strip() for scope in raw_scopes if str(scope).strip()}
+        return {
+            scope.strip()
+            for scope in str(raw_scopes or "").split(",")
+            if scope.strip()
+        }
+
+    def _to_float(self, value: Any) -> float | None:
+        if value is None or value == "":
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     def _normalize_payment_method(self, payload: dict[str, Any]) -> str:
         gateways = [

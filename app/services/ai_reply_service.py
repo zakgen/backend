@@ -4,6 +4,7 @@ from collections.abc import Mapping
 import json
 import logging
 from typing import Any
+from datetime import UTC, datetime, timedelta
 
 from fastapi import HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -374,19 +375,31 @@ class AIReplyService:
                         reply=validated_reply,
                         connection=connection,
                     )
-                    logger.info(
-                        "AI reply sent for business %s phone=%s inbound_message_id=%s outbound_message_id=%s",
-                        business_id,
-                        phone,
-                        inbound_chat_message_id,
-                        outbound_row["id"],
-                    )
-                    run_row = await self.ai_run_repository.update_run(
-                        int(run_row["id"]),
-                        status_value="sent",
-                        outbound_chat_message_id=int(outbound_row["id"]),
-                    )
-                sent = True
+                    if outbound_row is None:
+                        logger.info(
+                            "AI reply skipped outside 24h window business_id=%s phone=%s inbound_message_id=%s",
+                            business_id,
+                            phone,
+                            inbound_chat_message_id,
+                        )
+                        run_row = await self.ai_run_repository.update_run(
+                            int(run_row["id"]),
+                            status_value="skipped",
+                        )
+                    else:
+                        logger.info(
+                            "AI reply sent for business %s phone=%s inbound_message_id=%s outbound_message_id=%s",
+                            business_id,
+                            phone,
+                            inbound_chat_message_id,
+                            outbound_row["id"],
+                        )
+                        run_row = await self.ai_run_repository.update_run(
+                            int(run_row["id"]),
+                            status_value="sent",
+                            outbound_chat_message_id=int(outbound_row["id"]),
+                        )
+                        sent = True
             except Exception as exc:
                 logger.exception(
                     "AI reply send failed for business %s phone=%s inbound_message_id=%s",
@@ -1010,8 +1023,10 @@ class AIReplyService:
         phone: str,
         reply: AIModelReply,
         connection: dict[str, Any],
-    ) -> dict[str, Any]:
+    ) -> dict[str, Any] | None:
         config = dict(connection.get("config") or {})
+        if not await self._is_free_text_allowed(business_id, phone):
+            return None
         result = await self.messaging_provider.send_text(
             SendMessageCommand(
                 business_id=business_id,
@@ -1043,6 +1058,35 @@ class AIReplyService:
             touch_last_activity=True,
         )
         return row
+
+    async def _is_free_text_allowed(self, business_id: int, phone: str) -> bool:
+        rows = await self.chat_repository.list_messages(
+            business_id,
+            phone=phone,
+            direction="inbound",
+            limit=1,
+        )
+        if not rows:
+            return False
+        last_inbound = self._coerce_datetime(rows[0].get("created_at"))
+        if last_inbound is None:
+            return False
+        return datetime.now(UTC) - last_inbound <= timedelta(hours=24)
+
+    @staticmethod
+    def _coerce_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=UTC)
+        if isinstance(value, str):
+            try:
+                normalized = value.replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(normalized)
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+            except ValueError:
+                return None
+        return None
 
     def _result_to_response(self, result: dict[str, Any]) -> AIReplyResponse:
         run = result["run"]

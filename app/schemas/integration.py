@@ -32,6 +32,9 @@ class CommerceIntegration(BaseModel):
     last_activity_at: str | None = None
     last_sync_back_at: str | None = None
     webhook_status: str | None = None
+    last_product_import_at: str | None = None
+    last_product_import_status: str | None = None
+    last_product_import_error: str | None = None
 
 
 class ComingSoonIntegration(BaseModel):
@@ -68,3 +71,13 @@ class WhatsAppTestResponse(BaseModel):
 
 class ShopifyConnectResponse(BaseModel):
     auth_url: str
+
+
+class ShopifyProductImportResponse(BaseModel):
+    business_id: int
+    shop_domain: str
+    fetched_products: int
+    imported_products: int
+    product_ids: list[int] = Field(default_factory=list)
+    last_product_import_at: str
+    last_product_import_status: str

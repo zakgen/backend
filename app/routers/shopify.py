@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Query, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.integration import ShopifyConnectResponse
+from app.schemas.integration import ShopifyConnectResponse, ShopifyProductImportResponse
 from app.services.database import get_session
 from app.services.auth import AuthenticatedUser, require_business_access
 from app.services.shopify_service import ShopifyService
@@ -34,6 +34,21 @@ async def connect_shopify(
     if redirect:
         return RedirectResponse(auth_url, status_code=status.HTTP_307_TEMPORARY_REDIRECT)
     return ShopifyConnectResponse(auth_url=auth_url)
+
+
+@router.post(
+    "/business/{business_id}/integrations/shopify/products/import",
+    response_model=ShopifyProductImportResponse,
+    status_code=status.HTTP_200_OK,
+)
+async def import_shopify_products(
+    business_id: int,
+    current_user: AuthenticatedUser = Depends(require_business_access),
+    session: AsyncSession = Depends(get_session),
+) -> ShopifyProductImportResponse:
+    result = await ShopifyService(session=session).import_products(business_id=business_id)
+    await session.commit()
+    return ShopifyProductImportResponse.model_validate(result)
 
 
 @router.get("/integrations/shopify/callback", status_code=status.HTTP_307_TEMPORARY_REDIRECT)

@@ -78,6 +78,54 @@ class FakeOrderRepository:
         return self.external_order
 
 
+class FakeProductRepository:
+    def __init__(self) -> None:
+        self.products_by_key: dict[tuple[int, str], dict] = {}
+        self.next_id = 1
+
+    async def bulk_upsert(self, payload) -> list[dict]:
+        rows = []
+        for product in payload.products:
+            key = (payload.business_id, str(product.external_id))
+            existing = self.products_by_key.get(key)
+            now = datetime.now(UTC)
+            if existing is None:
+                row = {
+                    "id": self.next_id,
+                    "business_id": payload.business_id,
+                    "external_id": product.external_id,
+                    "name": product.name,
+                    "description": product.description,
+                    "price": product.price,
+                    "currency": product.currency,
+                    "category": product.category,
+                    "availability": product.availability,
+                    "variants": product.variants,
+                    "tags": product.tags,
+                    "metadata": product.metadata,
+                    "created_at": now,
+                    "updated_at": now,
+                }
+                self.next_id += 1
+            else:
+                row = {
+                    **existing,
+                    "name": product.name,
+                    "description": product.description,
+                    "price": product.price,
+                    "currency": product.currency,
+                    "category": product.category,
+                    "availability": product.availability,
+                    "variants": product.variants,
+                    "tags": product.tags,
+                    "metadata": product.metadata,
+                    "updated_at": now,
+                }
+            self.products_by_key[key] = row
+            rows.append(row)
+        return rows
+
+
 def _settings() -> Settings:
     return Settings(
         database_backend="mongo",
@@ -86,12 +134,12 @@ def _settings() -> Settings:
         shopify_api_key="shopify-key",
         shopify_api_secret="shopify-secret",
         shopify_app_base_url="https://api.example.com",
-        shopify_scopes="read_orders,write_orders",
+        shopify_scopes="read_orders,write_orders,read_products",
         shopify_api_version="2025-07",
     )
 
 
-def _service(http_client: FakeHTTPClient | None = None) -> tuple[ShopifyService, FakeIntegrationRepository, FakeOrderRepository]:
+def _service(http_client: FakeHTTPClient | None = None) -> tuple[ShopifyService, FakeIntegrationRepository, FakeOrderRepository, FakeProductRepository]:
     settings = _settings()
     service = ShopifyService(
         session=type("DummyRepoSession", (), {"db": None})(),
@@ -104,13 +152,15 @@ def _service(http_client: FakeHTTPClient | None = None) -> tuple[ShopifyService,
     service.integration_repository = integration_repository
     order_repository = FakeOrderRepository()
     service.order_repository = order_repository
+    product_repository = FakeProductRepository()
+    service.product_repository = product_repository
 
     class FakeOrderConfirmationRepository:
         async def find_latest_by_order(self, business_id: int, order_id: int):
             return None
 
     service.order_confirmation_repository = FakeOrderConfirmationRepository()
-    return service, integration_repository, order_repository
+    return service, integration_repository, order_repository, product_repository
 
 
 def _oauth_hmac(secret: str, params: dict[str, str]) -> str:
@@ -129,7 +179,7 @@ def _webhook_hmac(secret: str, body: bytes) -> str:
 
 
 def test_begin_oauth_install_builds_shopify_redirect() -> None:
-    service, _, _ = _service()
+    service, _, _, _ = _service()
 
     import asyncio
 
@@ -149,15 +199,15 @@ def test_begin_oauth_install_builds_shopify_redirect() -> None:
 def test_handle_oauth_callback_stores_connection_and_registers_webhooks() -> None:
     http_client = FakeHTTPClient()
     http_client.post_responses = [
-        httpx.Response(200, json={"access_token": "shpat_123", "scope": "read_orders,write_orders"}),
+        httpx.Response(200, json={"access_token": "shpat_123", "scope": "read_orders,write_orders,read_products"}),
         httpx.Response(201, json={"webhook": {"id": 101}}),
         httpx.Response(201, json={"webhook": {"id": 102}}),
         httpx.Response(201, json={"webhook": {"id": 103}}),
     ]
     http_client.get_responses = [
-        httpx.Response(200, json={"shop": {"id": 77, "name": "Demo Shop"}}),
+        httpx.Response(200, json={"shop": {"id": 77, "name": "Demo Shop", "currency": "USD"}}),
     ]
-    service, integration_repository, _ = _service(http_client)
+    service, integration_repository, _, _ = _service(http_client)
     state = service.crypto_service.encrypt_json(
         {
             "business_id": 2,
@@ -183,18 +233,19 @@ def test_handle_oauth_callback_stores_connection_and_registers_webhooks() -> Non
     assert config["shop_domain"] == "demo-shop.myshopify.com"
     assert config["offline_access_token_encrypted"] != "shpat_123"
     assert config["webhook_subscription_ids"]["orders/create"] == 101
+    assert config["shop_currency"] == "USD"
 
 
 def test_handle_oauth_callback_reuses_existing_webhooks_on_422() -> None:
     http_client = FakeHTTPClient()
     http_client.post_responses = [
-        httpx.Response(200, json={"access_token": "shpat_123", "scope": "read_orders,write_orders"}),
+        httpx.Response(200, json={"access_token": "shpat_123", "scope": "read_orders,write_orders,read_products"}),
         httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
         httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
         httpx.Response(422, json={"errors": {"address": ["has already been taken for this topic"]}}),
     ]
     http_client.get_responses = [
-        httpx.Response(200, json={"shop": {"id": 77, "name": "Demo Shop"}}),
+        httpx.Response(200, json={"shop": {"id": 77, "name": "Demo Shop", "currency": "USD"}}),
         httpx.Response(
             200,
             json={
@@ -262,7 +313,7 @@ def test_handle_oauth_callback_reuses_existing_webhooks_on_422() -> None:
             },
         ),
     ]
-    service, integration_repository, _ = _service(http_client)
+    service, integration_repository, _, _ = _service(http_client)
     state = service.crypto_service.encrypt_json(
         {
             "business_id": 2,
@@ -291,7 +342,7 @@ def test_handle_oauth_callback_reuses_existing_webhooks_on_422() -> None:
 
 
 def test_orders_create_webhook_is_idempotent_on_duplicate_event(monkeypatch) -> None:
-    service, integration_repository, _ = _service()
+    service, integration_repository, _, _ = _service()
     integration_repository.connection = {
         "id": 11,
         "business_id": 2,
@@ -323,7 +374,7 @@ def test_orders_create_webhook_is_idempotent_on_duplicate_event(monkeypatch) -> 
 
 
 def test_orders_updated_ignores_finalized_internal_order() -> None:
-    service, integration_repository, order_repository = _service()
+    service, integration_repository, order_repository, _ = _service()
     integration_repository.connection = {
         "id": 11,
         "business_id": 2,
@@ -371,7 +422,7 @@ def test_sync_order_confirmation_status_updates_tags_and_note() -> None:
             json={"data": {"orderUpdate": {"order": {"id": "gid://shopify/Order/1", "tags": ["vip", "zakbot:confirmed"], "note": "updated"}, "userErrors": []}}},
         ),
     ]
-    service, integration_repository, _ = _service(http_client)
+    service, integration_repository, _, _ = _service(http_client)
     encrypted_token = service.crypto_service.encrypt_text("shpat_123")
     integration_repository.connection = {
         "id": 11,
@@ -414,7 +465,7 @@ def test_sync_order_confirmation_status_updates_tags_and_note() -> None:
 
 def test_sync_order_confirmation_status_skips_pending_states() -> None:
     http_client = FakeHTTPClient()
-    service, integration_repository, _ = _service(http_client)
+    service, integration_repository, _, _ = _service(http_client)
     integration_repository.connection = {
         "id": 11,
         "business_id": 2,
@@ -454,7 +505,7 @@ def test_sync_order_confirmation_status_skips_pending_states() -> None:
 
 
 def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
-    service, integration_repository, _ = _service()
+    service, integration_repository, _, _ = _service()
     integration_repository.connection = {
         "id": 11,
         "business_id": 2,
@@ -522,7 +573,7 @@ def test_orders_create_webhook_creates_internal_session(monkeypatch) -> None:
 
 
 def test_orders_updated_can_trigger_first_confirmation_if_session_is_still_pending_send(monkeypatch) -> None:
-    service, integration_repository, order_repository = _service()
+    service, integration_repository, order_repository, _ = _service()
     integration_repository.connection = {
         "id": 11,
         "business_id": 2,
@@ -599,3 +650,278 @@ def test_orders_updated_can_trigger_first_confirmation_if_session_is_still_pendi
 
     assert result["status"] == "accepted"
     assert result["confirmation_message_sent"] is True
+
+
+def test_import_products_fetches_pages_and_upserts_without_duplicates(monkeypatch) -> None:
+    http_client = FakeHTTPClient()
+    http_client.post_responses = [
+        httpx.Response(
+            200,
+            json={
+                "data": {
+                    "products": {
+                        "pageInfo": {"hasNextPage": True, "endCursor": "cursor-2"},
+                        "nodes": [
+                            {
+                                "id": "gid://shopify/Product/111",
+                                "legacyResourceId": "111",
+                                "title": "Snowboard",
+                                "description": "All-mountain board",
+                                "productType": "Boards",
+                                "tags": ["winter", "sport"],
+                                "status": "ACTIVE",
+                                "vendor": "Burton",
+                                "variants": {
+                                    "nodes": [
+                                        {
+                                            "id": "gid://shopify/ProductVariant/1",
+                                            "legacyResourceId": "1",
+                                            "title": "Blue",
+                                            "sku": "SNOW-BLUE",
+                                            "price": "1000.00",
+                                            "availableForSale": True,
+                                        },
+                                        {
+                                            "id": "gid://shopify/ProductVariant/2",
+                                            "legacyResourceId": "2",
+                                            "title": "Red",
+                                            "sku": "SNOW-RED",
+                                            "price": "1050.00",
+                                            "availableForSale": False,
+                                        },
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "data": {
+                    "products": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "id": "gid://shopify/Product/222",
+                                "legacyResourceId": "222",
+                                "title": "Helmet",
+                                "description": "Safe ride",
+                                "productType": "Accessories",
+                                "tags": [],
+                                "status": "DRAFT",
+                                "vendor": "Smith",
+                                "variants": {
+                                    "nodes": [
+                                        {
+                                            "id": "gid://shopify/ProductVariant/3",
+                                            "legacyResourceId": "3",
+                                            "title": "Default Title",
+                                            "sku": "HELMET",
+                                            "price": "200.00",
+                                            "availableForSale": True,
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "data": {
+                    "products": {
+                        "pageInfo": {"hasNextPage": True, "endCursor": "cursor-2"},
+                        "nodes": [
+                            {
+                                "id": "gid://shopify/Product/111",
+                                "legacyResourceId": "111",
+                                "title": "Snowboard",
+                                "description": "All-mountain board",
+                                "productType": "Boards",
+                                "tags": ["winter", "sport"],
+                                "status": "ACTIVE",
+                                "vendor": "Burton",
+                                "variants": {
+                                    "nodes": [
+                                        {
+                                            "id": "gid://shopify/ProductVariant/1",
+                                            "legacyResourceId": "1",
+                                            "title": "Blue",
+                                            "sku": "SNOW-BLUE",
+                                            "price": "1000.00",
+                                            "availableForSale": True,
+                                        },
+                                        {
+                                            "id": "gid://shopify/ProductVariant/2",
+                                            "legacyResourceId": "2",
+                                            "title": "Red",
+                                            "sku": "SNOW-RED",
+                                            "price": "1050.00",
+                                            "availableForSale": False,
+                                        },
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        ),
+        httpx.Response(
+            200,
+            json={
+                "data": {
+                    "products": {
+                        "pageInfo": {"hasNextPage": False, "endCursor": None},
+                        "nodes": [
+                            {
+                                "id": "gid://shopify/Product/222",
+                                "legacyResourceId": "222",
+                                "title": "Helmet",
+                                "description": "Safe ride",
+                                "productType": "Accessories",
+                                "tags": [],
+                                "status": "DRAFT",
+                                "vendor": "Smith",
+                                "variants": {
+                                    "nodes": [
+                                        {
+                                            "id": "gid://shopify/ProductVariant/3",
+                                            "legacyResourceId": "3",
+                                            "title": "Default Title",
+                                            "sku": "HELMET",
+                                            "price": "200.00",
+                                            "availableForSale": True,
+                                        }
+                                    ]
+                                },
+                            }
+                        ],
+                    }
+                }
+            },
+        ),
+    ]
+    service, integration_repository, _, product_repository = _service(http_client)
+    integration_repository.connection = {
+        "id": 11,
+        "business_id": 2,
+        "integration_type": "shopify",
+        "status": "connected",
+        "health": "healthy",
+        "config": {
+            "shop_domain": "demo-shop.myshopify.com",
+            "offline_access_token_encrypted": service.crypto_service.encrypt_text("shpat_123"),
+            "shop_currency": "USD",
+            "scopes": ["read_orders", "write_orders", "read_products"],
+        },
+        "metrics": {},
+        "last_activity_at": None,
+        "last_synced_at": None,
+    }
+
+    class FakeSyncService:
+        calls: list[tuple[int, list[int] | None]] = []
+
+        def __init__(self, session, embedding_service) -> None:
+            self.session = session
+            self.embedding_service = embedding_service
+
+        async def sync_products(self, business_id: int, product_ids: list[int] | None = None) -> int:
+            self.calls.append((business_id, product_ids))
+            return len(product_ids or [])
+
+        async def update_status_snapshot(self, business_id: int, *, last_result: str | None = None, status_value: str | None = None):
+            return {"business_id": business_id, "last_result": last_result, "status": status_value}
+
+    monkeypatch.setattr(shopify_service_module, "SyncService", FakeSyncService)
+
+    import asyncio
+
+    first = asyncio.run(service.import_products(business_id=2))
+    second = asyncio.run(service.import_products(business_id=2))
+
+    assert first["fetched_products"] == 2
+    assert first["imported_products"] == 2
+    assert len(product_repository.products_by_key) == 2
+    snowboard = product_repository.products_by_key[(2, "111")]
+    assert snowboard["price"] == 1000.0
+    assert snowboard["availability"] == "in_stock"
+    assert snowboard["variants"][1]["additional_price"] == 50.0
+    helmet = product_repository.products_by_key[(2, "222")]
+    assert helmet["availability"] == "out_of_stock"
+    assert integration_repository.connection["config"]["last_product_import_status"] == "success"
+    assert integration_repository.connection["metrics"]["imported_products"] == 2
+    assert second["imported_products"] == 2
+    assert len(product_repository.products_by_key) == 2
+    assert FakeSyncService.calls[0][0] == 2
+    assert set(FakeSyncService.calls[0][1] or []) == {1, 2}
+
+
+def test_import_products_requires_read_products_scope() -> None:
+    service, integration_repository, _, _ = _service()
+    integration_repository.connection = {
+        "id": 11,
+        "business_id": 2,
+        "integration_type": "shopify",
+        "status": "connected",
+        "health": "healthy",
+        "config": {
+            "shop_domain": "demo-shop.myshopify.com",
+            "offline_access_token_encrypted": service.crypto_service.encrypt_text("shpat_123"),
+            "scopes": ["read_orders", "write_orders"],
+        },
+        "metrics": {},
+        "last_activity_at": None,
+        "last_synced_at": None,
+    }
+
+    import asyncio
+    import pytest
+    from fastapi import HTTPException
+
+    with pytest.raises(HTTPException) as exc_info:
+        asyncio.run(service.import_products(business_id=2))
+
+    assert exc_info.value.status_code == 409
+    assert "read_products" in str(exc_info.value.detail)
+
+
+def test_import_products_records_failure_status(monkeypatch) -> None:
+    http_client = FakeHTTPClient()
+    http_client.post_responses = [
+        httpx.Response(500, json={"errors": "boom"}),
+    ]
+    service, integration_repository, _, _ = _service(http_client)
+    integration_repository.connection = {
+        "id": 11,
+        "business_id": 2,
+        "integration_type": "shopify",
+        "status": "connected",
+        "health": "healthy",
+        "config": {
+            "shop_domain": "demo-shop.myshopify.com",
+            "offline_access_token_encrypted": service.crypto_service.encrypt_text("shpat_123"),
+            "shop_currency": "USD",
+            "scopes": ["read_orders", "write_orders", "read_products"],
+        },
+        "metrics": {},
+        "last_activity_at": None,
+        "last_synced_at": None,
+    }
+
+    import asyncio
+    import pytest
+    import httpx as httpx_module
+
+    with pytest.raises(httpx_module.HTTPStatusError):
+        asyncio.run(service.import_products(business_id=2))
+
+    assert integration_repository.connection["config"]["last_product_import_status"] == "failed"
+    assert integration_repository.connection["config"]["last_product_import_error"]

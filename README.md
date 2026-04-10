@@ -134,7 +134,7 @@ Copy `.env.example` to `.env` and fill in:
 - `SHOPIFY_API_KEY`: Shopify app client id
 - `SHOPIFY_API_SECRET`: Shopify app client secret
 - `SHOPIFY_APP_BASE_URL`: Public backend base URL used for Shopify callback and webhook registration
-- `SHOPIFY_SCOPES`: Comma-separated Shopify app scopes, default `read_orders,write_orders`
+- `SHOPIFY_SCOPES`: Comma-separated Shopify app scopes, default `read_orders,write_orders,read_products`
 - `SHOPIFY_API_VERSION`: Shopify Admin API version, default `2025-07`
 
 ## MongoDB migration scaffolding

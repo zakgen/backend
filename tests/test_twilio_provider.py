@@ -19,6 +19,7 @@ class FakeMasterClient:
 
 class FakeMessagesAPI:
     def create(self, **kwargs) -> SimpleNamespace:
+        body = kwargs.get("body")
         return SimpleNamespace(
             sid="MM123",
             status="queued",
@@ -28,7 +29,8 @@ class FakeMessagesAPI:
                 "status": "queued",
                 "to": kwargs["to"],
                 "from_": kwargs["from_"],
-                "body": kwargs["body"],
+                "body": body,
+                "content_sid": kwargs.get("content_sid"),
             },
         )
 

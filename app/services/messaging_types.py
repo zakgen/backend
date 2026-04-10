@@ -21,6 +21,8 @@ class SendMessageCommand:
     text: str
     config: dict[str, Any]
     subaccount_sid: str
+    content_sid: str | None = None
+    content_variables: dict[str, Any] | None = None
 
 
 @dataclass(slots=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import json
 from typing import Any
 
 from fastapi import HTTPException, status
@@ -153,12 +154,19 @@ class TwilioMessagingProvider(AbstractMessagingProvider):
             )
 
         try:
-            message = self._subaccount_client(command.subaccount_sid).messages.create(
-                from_=f"whatsapp:{sender_phone}",
-                to=f"whatsapp:{normalize_phone_number(command.phone)}",
-                body=command.text,
-                status_callback=status_callback,
-            )
+            payload: dict[str, Any] = {
+                "from_": f"whatsapp:{sender_phone}",
+                "to": f"whatsapp:{normalize_phone_number(command.phone)}",
+                "status_callback": status_callback,
+            }
+            if command.content_sid:
+                payload["content_sid"] = command.content_sid
+                if command.content_variables is not None:
+                    payload["content_variables"] = json.dumps(command.content_variables)
+            else:
+                payload["body"] = command.text
+
+            message = self._subaccount_client(command.subaccount_sid).messages.create(**payload)
         except self._twilio_exception_class() as exc:
             raise HTTPException(
                 status_code=status.HTTP_502_BAD_GATEWAY,

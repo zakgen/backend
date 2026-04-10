@@ -125,3 +125,33 @@ def test_shopify_order_create_webhook_route_returns_status(monkeypatch) -> None:
     app.dependency_overrides.clear()
     assert response.status_code == 200
     assert response.json() == {"status": "accepted"}
+
+
+def test_shopify_product_import_route_returns_summary(monkeypatch) -> None:
+    class FakeShopifyService:
+        def __init__(self, *, session, **kwargs) -> None:
+            self.session = session
+
+        async def import_products(self, *, business_id: int):
+            assert business_id == 2
+            return {
+                "business_id": 2,
+                "shop_domain": "demo-shop.myshopify.com",
+                "fetched_products": 3,
+                "imported_products": 3,
+                "product_ids": [10, 11, 12],
+                "last_product_import_at": "2026-04-06T18:00:00Z",
+                "last_product_import_status": "success",
+            }
+
+    app.dependency_overrides[get_session] = fake_session
+    app.dependency_overrides[require_business_access] = fake_current_user
+    monkeypatch.setattr(shopify_router, "ShopifyService", FakeShopifyService)
+
+    with TestClient(app) as client:
+        response = client.post("/business/2/integrations/shopify/products/import")
+
+    app.dependency_overrides.clear()
+    assert response.status_code == 200
+    assert response.json()["imported_products"] == 3
+    assert response.json()["product_ids"] == [10, 11, 12]

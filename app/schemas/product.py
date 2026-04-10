@@ -5,6 +5,9 @@ from typing import Any, Literal
 from pydantic import BaseModel, ConfigDict, Field
 
 
+ProductVariantValue = str | dict[str, Any]
+
+
 class ProductUpsertRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -17,7 +20,7 @@ class ProductUpsertRequest(BaseModel):
     currency: str = Field(default="MAD", min_length=3, max_length=10)
     category: str | None = Field(default=None, max_length=120)
     availability: str | None = Field(default="in_stock", max_length=50)
-    variants: list[str] = Field(default_factory=list)
+    variants: list[ProductVariantValue] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -33,7 +36,7 @@ class ProductBulkItem(BaseModel):
     currency: str = Field(default="MAD", min_length=3, max_length=10)
     category: str | None = Field(default=None, max_length=120)
     availability: str | None = Field(default="in_stock", max_length=50)
-    variants: list[str] = Field(default_factory=list)
+    variants: list[ProductVariantValue] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
@@ -55,7 +58,7 @@ class ProductResponse(BaseModel):
     currency: str | None = None
     category: str | None = None
     availability: str | None = None
-    variants: list[str] = Field(default_factory=list)
+    variants: list[ProductVariantValue] = Field(default_factory=list)
     tags: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 

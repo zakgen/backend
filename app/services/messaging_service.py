@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
@@ -141,6 +141,28 @@ class MessagingService:
     ) -> dict[str, Any]:
         connection = await self.get_ready_whatsapp_connection(business_id)
         config = dict(connection.get("config") or {})
+        if not await self._is_free_text_allowed(business_id, phone):
+            logger.info(
+                "Free-text reply skipped outside 24h window business_id=%s phone=%s",
+                business_id,
+                phone,
+            )
+            row = await self.chat_repository.upsert_message(
+                business_id=business_id,
+                phone=phone,
+                customer_name=None,
+                text=payload.text,
+                direction="outbound",
+                intent=payload.intent,
+                needs_human=payload.needs_human or False,
+                is_read=True,
+                provider=self.provider.provider_name,
+                provider_message_sid=None,
+                provider_status="skipped_window",
+                error_code="outside_24h_window",
+                raw_payload={"skipped": True, "reason": "outside_24h_window"},
+            )
+            return chat_row_to_message(row).model_dump()
         result = await self.provider.send_text(
             SendMessageCommand(
                 business_id=business_id,
@@ -172,6 +194,35 @@ class MessagingService:
             touch_last_activity=True,
         )
         return chat_row_to_message(row).model_dump()
+
+    async def _is_free_text_allowed(self, business_id: int, phone: str) -> bool:
+        rows = await self.chat_repository.list_messages(
+            business_id,
+            phone=phone,
+            direction="inbound",
+            limit=1,
+        )
+        if not rows:
+            return False
+        last_inbound = self._coerce_datetime(rows[0].get("created_at"))
+        if last_inbound is None:
+            return False
+        return datetime.now(UTC) - last_inbound <= timedelta(hours=24)
+
+    @staticmethod
+    def _coerce_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=UTC)
+        if isinstance(value, str):
+            try:
+                normalized = value.replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(normalized)
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+            except ValueError:
+                return None
+        return None
 
     async def handle_inbound_webhook(
         self, *, url: str, headers: Mapping[str, str], params: Mapping[str, Any]

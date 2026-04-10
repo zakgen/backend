@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import logging
 from typing import Any
 
@@ -31,6 +31,8 @@ ACTIVE_SESSION_STATUSES = {
 }
 
 logger = logging.getLogger(__name__)
+ORDER_CONFIRMATION_TEMPLATE_SID_FR = "HXb2abf2118ad2204e79bb7e98bf606b8c"
+ORDER_CONFIRMATION_TEMPLATE_SID_AR = "HX0d04a9dd60c8885d847d7f6d5ee7a1b9"
 
 
 class OrderConfirmationService:
@@ -135,16 +137,24 @@ class OrderConfirmationService:
                 order_row.get("customer_phone"),
             )
             connection = await self._get_ready_whatsapp_connection(business_id)
+            language = normalize_language_label(order_row.get("preferred_language"), "french")
             confirmation_message = self._build_initial_confirmation_message(
                 business_name=str(business_row.get("name") or ""),
                 order_row=order_row,
-                language=normalize_language_label(order_row.get("preferred_language"), "french"),
+                language=language,
+            )
+            template_sid = self._resolve_confirmation_template_sid(language)
+            template_variables = self._build_confirmation_template_variables(
+                snapshot=snapshot,
+                business_name=str(business_row.get("name") or ""),
             )
             outbound_row = await self._send_text(
                 business_id=business_id,
                 phone=str(order_row["customer_phone"]),
                 text=confirmation_message,
                 connection=connection,
+                content_sid=template_sid,
+                content_variables=template_variables,
             )
             logger.info(
                 "Order confirmation message sent business_id=%s order_id=%s provider_message_sid=%s",
@@ -173,7 +183,11 @@ class OrderConfirmationService:
                 session_id=int(session_row["id"]),
                 order_id=int(order_row["id"]),
                 event_type="confirmation_sent",
-                payload={"text": confirmation_message},
+                payload={
+                    "text": confirmation_message,
+                    "template_sid": template_sid,
+                    "template_variables": template_variables,
+                },
             )
         else:
             logger.info(
@@ -718,11 +732,18 @@ class OrderConfirmationService:
                 order_row=order_row,
                 language=language,
             )
+            template_sid = self._resolve_confirmation_template_sid(language)
+            template_variables = self._build_confirmation_template_variables(
+                snapshot=metadata_snapshot,
+                business_name=str(business_row.get("name") or ""),
+            )
             outbound_row = await self._send_text(
                 business_id=business_id,
                 phone=str(session_row["phone"]),
                 text=confirmation_message,
                 connection=connection,
+                content_sid=template_sid,
+                content_variables=template_variables,
             )
             update_payload = {
                 "status": "awaiting_customer",
@@ -800,8 +821,31 @@ class OrderConfirmationService:
         phone: str,
         text: str,
         connection: dict[str, Any],
+        content_sid: str | None = None,
+        content_variables: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         config = dict(connection.get("config") or {})
+        if content_sid is None and not await self._is_free_text_allowed(business_id, phone):
+            logger.info(
+                "Order confirmation reply skipped outside 24h window business_id=%s phone=%s",
+                business_id,
+                phone,
+            )
+            return await self.chat_repository.upsert_message(
+                business_id=business_id,
+                phone=phone,
+                customer_name=None,
+                text=text,
+                direction="outbound",
+                intent="autre",
+                needs_human=False,
+                is_read=True,
+                provider=self.messaging_provider.provider_name,
+                provider_message_sid=None,
+                provider_status="skipped_window",
+                error_code="outside_24h_window",
+                raw_payload={"skipped": True, "reason": "outside_24h_window"},
+            )
         result = await self.messaging_provider.send_text(
             SendMessageCommand(
                 business_id=business_id,
@@ -809,6 +853,8 @@ class OrderConfirmationService:
                 text=text,
                 config=config,
                 subaccount_sid=str(config["subaccount_sid"]),
+                content_sid=content_sid,
+                content_variables=content_variables,
             )
         )
         row = await self.chat_repository.upsert_message(
@@ -834,6 +880,35 @@ class OrderConfirmationService:
         )
         return row
 
+    async def _is_free_text_allowed(self, business_id: int, phone: str) -> bool:
+        rows = await self.chat_repository.list_messages(
+            business_id,
+            phone=phone,
+            direction="inbound",
+            limit=1,
+        )
+        if not rows:
+            return False
+        last_inbound = self._coerce_datetime(rows[0].get("created_at"))
+        if last_inbound is None:
+            return False
+        return datetime.now(UTC) - last_inbound <= timedelta(hours=24)
+
+    @staticmethod
+    def _coerce_datetime(value: Any) -> datetime | None:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value if value.tzinfo else value.replace(tzinfo=UTC)
+        if isinstance(value, str):
+            try:
+                normalized = value.replace("Z", "+00:00")
+                parsed = datetime.fromisoformat(normalized)
+                return parsed if parsed.tzinfo else parsed.replace(tzinfo=UTC)
+            except ValueError:
+                return None
+        return None
+
     def _build_snapshot(self, business_row: dict[str, Any], order_row: dict[str, Any]) -> dict[str, Any]:
         return {
             "business_name": business_row.get("name"),
@@ -848,6 +923,34 @@ class OrderConfirmationService:
             "items": list(order_row.get("items") or []),
             "payment_method": order_row.get("payment_method"),
             "order_notes": order_row.get("order_notes"),
+        }
+
+    def _resolve_confirmation_template_sid(self, language: str) -> str:
+        if language == "french":
+            return ORDER_CONFIRMATION_TEMPLATE_SID_FR
+        return ORDER_CONFIRMATION_TEMPLATE_SID_AR
+
+    def _build_confirmation_template_variables(
+        self,
+        *,
+        snapshot: dict[str, Any],
+        business_name: str,
+    ) -> dict[str, str]:
+        customer_name = str(snapshot.get("customer_name") or "").strip() or "Client"
+        items = snapshot.get("items") or []
+        items_summary = ", ".join(self._item_summary(item) for item in items[:3]) or "-"
+        delivery_address = str(snapshot.get("delivery_address") or "").strip() or "-"
+        delivery_city = str(snapshot.get("delivery_city") or "").strip() or "-"
+        total_amount = snapshot.get("total_amount")
+        currency = snapshot.get("currency") or "MAD"
+        total_line = f"{total_amount} {currency}" if total_amount is not None else f"- {currency}"
+        return {
+            "1": str(customer_name),
+            "2": str(business_name or "ZakBot"),
+            "3": str(items_summary),
+            "4": str(delivery_address),
+            "5": str(delivery_city),
+            "6": str(total_line),
         }
 
     def _prepare_confirmed_order_snapshot(
@@ -1037,11 +1140,47 @@ class OrderConfirmationService:
 
     def _detect_customer_action(self, message: str) -> str | None:
         normalized = message.strip().lower()
-        if normalized in {"1", "ok", "okay", "yes", "oui", "confirm", "confirmed", "confirmer", "valider", "wakha", "نعم"}:
+        if normalized in {
+            "1",
+            "ok",
+            "okay",
+            "yes",
+            "oui",
+            "confirm",
+            "confirmed",
+            "confirmer",
+            "confirmer commande",
+            "confirmer la commande",
+            "valider",
+            "wakha",
+            "نعم",
+            "تأكيد الطلب",
+        }:
             return "confirm"
-        if normalized in {"2", "edit", "modifier", "modify", "change", "بدل"}:
+        if normalized in {
+            "2",
+            "edit",
+            "modifier",
+            "modifier la commande",
+            "modify",
+            "change",
+            "بدل",
+            "تعديل الطلب",
+        }:
             return "request_edit"
-        if normalized in {"3", "cancel", "annuler", "annule", "non", "no", "رفض", "لا", "nlghi"}:
+        if normalized in {
+            "3",
+            "cancel",
+            "annuler",
+            "annuler la commande",
+            "annule",
+            "non",
+            "no",
+            "رفض",
+            "لا",
+            "nlghi",
+            "إلغاء الطلب",
+        }:
             return "decline"
         if normalized in {"4", "agent", "support", "human", "personne", "call me", "n3ayet", "اتصل"}:
             return "request_human"

@@ -50,7 +50,7 @@ class Settings(BaseSettings):
     shopify_api_key: str | None = None
     shopify_api_secret: SecretStr | None = None
     shopify_app_base_url: str | None = None
-    shopify_scopes: str = "read_orders,write_orders"
+    shopify_scopes: str = "read_orders,write_orders,read_products"
     shopify_api_version: str = "2025-07"
 
 

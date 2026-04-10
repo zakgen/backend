@@ -509,6 +509,9 @@ def build_platform_integration(
         last_activity_at=to_iso((connection_row or {}).get("last_activity_at")),
         last_sync_back_at=to_iso(config.get("last_sync_back_at")),
         webhook_status=str(config.get("webhook_status") or "") or None,
+        last_product_import_at=to_iso(config.get("last_product_import_at")),
+        last_product_import_status=str(config.get("last_product_import_status") or "") or None,
+        last_product_import_error=str(config.get("last_product_import_error") or "") or None,
     )
 
 

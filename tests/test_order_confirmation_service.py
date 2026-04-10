@@ -163,6 +163,24 @@ class FakeChatRepository:
         self.messages.append(row)
         return row
 
+    async def list_messages(
+        self,
+        business_id: int,
+        *,
+        phone: str | None = None,
+        direction: str | None = None,
+        limit: int = 50,
+    ):
+        rows = [
+            message
+            for message in self.messages
+            if message.get("business_id") == business_id
+            and (phone is None or message.get("phone") == phone)
+            and (direction is None or message.get("direction") == direction)
+        ]
+        rows.sort(key=lambda row: row.get("created_at") or datetime.min, reverse=True)
+        return rows[:limit]
+
     async def update_message_analysis(self, message_id: int, *, intent: str | None, needs_human: bool):
         self.analysis_updates.append((message_id, intent, needs_human))
         return {"id": message_id, "intent": intent, "needs_human": needs_human}
@@ -317,6 +335,28 @@ def _build_service() -> tuple[OrderConfirmationService, FakeChatRepository, Fake
     return service, chat_repository, order_repository, confirmation_repository
 
 
+def _seed_inbound(chat_repository: FakeChatRepository, business_id: int, phone: str, text: str) -> None:
+    import asyncio
+
+    asyncio.run(
+        chat_repository.upsert_message(
+            business_id=business_id,
+            phone=phone,
+            customer_name=None,
+            text=text,
+            direction="inbound",
+            intent=None,
+            needs_human=False,
+            is_read=True,
+            provider="twilio",
+            provider_message_sid="SM-INBOUND",
+            provider_status="received",
+            error_code=None,
+            raw_payload={},
+        )
+    )
+
+
 def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
 
@@ -417,6 +457,8 @@ def test_handle_inbound_confirm_marks_session_confirmed() -> None:
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(chat_repository, 2, "+212600000001", "1")
+
     import asyncio
 
     handled = asyncio.run(
@@ -486,6 +528,13 @@ def test_apply_action_resend_reopens_session() -> None:
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(
+        chat_repository,
+        2,
+        "+212600000001",
+        "Oui je confirme mais changez mon adresse à Hay Hassani",
+    )
+
     import asyncio
 
     detail = asyncio.run(
@@ -542,6 +591,13 @@ def test_handle_inbound_custom_edit_reply_uses_ai_interpretation() -> None:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
+
+    _seed_inbound(
+        chat_repository,
+        2,
+        "+212600000001",
+        "C'est quoi l'adresse de livraison actuelle ?",
+    )
 
     import asyncio
 
@@ -632,6 +688,8 @@ def test_handle_inbound_delivery_question_answers_without_handoff() -> None:
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(chat_repository, 2, "+212600000001", "Quantity: 3")
+
     import asyncio
 
     handled = asyncio.run(
@@ -707,6 +765,8 @@ def test_handle_inbound_quantity_edit_stays_automated_until_final_confirmation()
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(chat_repository, 2, "+212600000001", "1")
+
     import asyncio
 
     handled = asyncio.run(
@@ -778,6 +838,8 @@ def test_final_confirmation_after_edits_marks_order_confirmed() -> None:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
+
+    _seed_inbound(chat_repository, 2, "+212600000001", "2")
 
     import asyncio
 
@@ -851,6 +913,13 @@ def test_numeric_edit_option_keeps_initial_session_language() -> None:
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(
+        chat_repository,
+        2,
+        "+212600000001",
+        "Bonjour, je veux changer mon adresse",
+    )
+
     import asyncio
 
     handled = asyncio.run(
@@ -923,6 +992,8 @@ def test_custom_text_updates_session_language_for_following_replies() -> None:
         "updated_at": datetime.now(UTC),
     }
 
+    _seed_inbound(chat_repository, 2, "+212600000001", "Quantity: 3")
+
     import asyncio
 
     first_handled = asyncio.run(
@@ -945,6 +1016,8 @@ def test_custom_text_updates_session_language_for_following_replies() -> None:
     assert confirmation_repository.session["preferred_language"] == "english"
     assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "english"
     assert "Updated order summary" in chat_repository.messages[0]["text"]
+
+    _seed_inbound(chat_repository, 2, "+212600000001", "1")
 
     second_handled = asyncio.run(
         service.handle_inbound_message(
@@ -1014,6 +1087,8 @@ def test_custom_french_text_replaces_darija_session_language() -> None:
         "created_at": datetime.now(UTC),
         "updated_at": datetime.now(UTC),
     }
+
+    _seed_inbound(chat_repository, 2, "+212600000001", "Change it")
 
     import asyncio
 
@@ -1089,6 +1164,13 @@ def test_language_detection_failure_keeps_existing_session_language() -> None:
         raise RuntimeError("language detection unavailable")
 
     service.llm_provider.detect_language = broken_detect_language
+
+    _seed_inbound(
+        chat_repository,
+        2,
+        "+212600000001",
+        "I want to know the delivery details",
+    )
 
     import asyncio
 
