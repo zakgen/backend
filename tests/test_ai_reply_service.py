@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import pytest
 
 from app.config import Settings
-from app.schemas.ai import AIReplyRequest
+from app.schemas.ai import AIModelReply, AIReplyRequest, AISourceReference
 from app.schemas.business import BusinessProfile
 from app.schemas.order_confirmation import OrderSessionInterpretation
 from app.services.ai_reply_service import AIReplyService
@@ -16,13 +16,26 @@ class DummyLLMProvider:
     provider_name = "openai"
     model_name = "gpt-4.1-mini"
 
+    def __init__(self) -> None:
+        self.last_system_prompt: str | None = None
+        self.last_user_prompt: str | None = None
+        self.reply = AIModelReply(
+            reply_text="Delivery usually takes 24 to 48 hours.",
+            intent="livraison",
+            language="english",
+            grounded=True,
+            needs_human=False,
+            confidence=0.91,
+            reason_code="grounded_answer",
+            used_sources=[],
+        )
+
     async def generate_structured_reply(self, *, system_prompt: str, user_prompt: str):
-        raise AssertionError("LLM should not be called for deterministic replies.")
+        self.last_system_prompt = system_prompt
+        self.last_user_prompt = user_prompt
+        return self.reply.model_copy(deep=True), {"structured_reply": self.reply.model_dump(mode="json")}
 
     async def detect_language(self, *, message: str):
-        lowered = message.lower()
-        if "cancel my order" in lowered:
-            return "english", {"language_detection": {"language": "english"}}
         return "english", {"language_detection": {"language": "english"}}
 
     async def interpret_order_session(
@@ -104,23 +117,44 @@ def business_profile() -> BusinessProfile:
     )
 
 
-def _service() -> AIReplyService:
+def _service() -> tuple[AIReplyService, DummyLLMProvider]:
     settings = Settings(
         database_backend="postgres",
         db_url="postgresql+asyncpg://postgres:postgres@localhost:5432/zakbot",
     )
+    provider = DummyLLMProvider()
     service = AIReplyService(
         session=SimpleNamespace(),
-        llm_provider=DummyLLMProvider(),
+        llm_provider=provider,
         settings=settings,
     )
     service.ai_run_repository = DummyAIRunRepository()
-    return service
+    return service, provider
 
 
 @pytest.mark.asyncio
-async def test_generate_preview_returns_rule_based_hours_reply(monkeypatch, business_profile: BusinessProfile) -> None:
-    service = _service()
+async def test_generate_preview_uses_llm_grounded_flow_for_delivery_question(
+    monkeypatch, business_profile: BusinessProfile
+) -> None:
+    service, provider = _service()
+    provider.reply = AIModelReply(
+        reply_text="Delivery usually takes 24 to 48 hours.",
+        intent="livraison",
+        language="english",
+        grounded=True,
+        needs_human=False,
+        confidence=0.93,
+        reason_code="grounded_answer",
+        used_sources=[
+            AISourceReference(
+                type="business_fact",
+                id="delivery_time",
+                name="Delivery Time",
+                score=1.0,
+                metadata={"source_type": "business_profile", "fact_key": "delivery_time"},
+            )
+        ],
+    )
 
     async def fake_profile_loader(business_id: int):
         return business_profile
@@ -128,23 +162,59 @@ async def test_generate_preview_returns_rule_based_hours_reply(monkeypatch, busi
     async def fake_recent_messages(**kwargs):
         return []
 
+    async def fake_select_context(**kwargs):
+        return [
+            {
+                "type": "business_fact",
+                "id": "delivery_time",
+                "name": "Delivery Time",
+                "content": "24 to 48 hours",
+                "score": 1.0,
+                "metadata": {"source_type": "business_profile", "fact_key": "delivery_time"},
+            },
+            {
+                "type": "business_fact",
+                "id": "shipping_policy",
+                "name": "Shipping Policy",
+                "content": "Delivery available",
+                "score": 1.0,
+                "metadata": {"source_type": "business_profile", "fact_key": "shipping_policy"},
+            },
+        ]
+
     monkeypatch.setattr(service, "_load_business_profile", fake_profile_loader)
     monkeypatch.setattr(service, "_load_recent_messages", fake_recent_messages)
+    monkeypatch.setattr(service, "_select_context", fake_select_context)
 
     response = await service.generate_preview(
         2,
-        AIReplyRequest(message="What time do you open on Saturday and are you closed on Sunday?"),
+        AIReplyRequest(message="How long does delivery take?"),
     )
 
-    assert response.intent == "infos_boutique"
-    assert "Saturday: 10:00-17:00" in (response.reply_text or "")
-    assert "Sunday: Closed" in (response.reply_text or "")
+    assert response.intent == "livraison"
+    assert response.reply_text == "Delivery usually takes 24 to 48 hours."
     assert response.needs_human is False
+    assert provider.last_system_prompt is not None
+    assert provider.last_user_prompt is not None
+    assert "Delivery Time" in provider.last_user_prompt
+    assert "How long does delivery take?" in provider.last_user_prompt
 
 
 @pytest.mark.asyncio
-async def test_generate_preview_returns_order_handoff(monkeypatch, business_profile: BusinessProfile) -> None:
-    service = _service()
+async def test_generate_preview_escalates_when_grounded_evidence_is_missing(
+    monkeypatch, business_profile: BusinessProfile
+) -> None:
+    service, provider = _service()
+    provider.reply = AIModelReply(
+        reply_text="Please contact support for that request.",
+        intent="autre",
+        language="english",
+        grounded=False,
+        needs_human=True,
+        confidence=0.35,
+        reason_code="missing_evidence",
+        used_sources=[],
+    )
 
     async def fake_profile_loader(business_id: int):
         return business_profile
@@ -152,18 +222,38 @@ async def test_generate_preview_returns_order_handoff(monkeypatch, business_prof
     async def fake_recent_messages(**kwargs):
         return []
 
+    async def fake_select_context(**kwargs):
+        return []
+
     monkeypatch.setattr(service, "_load_business_profile", fake_profile_loader)
     monkeypatch.setattr(service, "_load_recent_messages", fake_recent_messages)
+    monkeypatch.setattr(service, "_select_context", fake_select_context)
 
     response = await service.generate_preview(
         2,
-        AIReplyRequest(message="Can I cancel my order and make a complaint here?"),
+        AIReplyRequest(message="Can I change my confirmed order?"),
     )
 
-    assert response.intent == "autre"
     assert response.needs_human is True
-    assert "support" in (response.reply_text or "").lower()
-    assert "whatsapp" in (response.reply_text or "").lower()
+    assert response.decision == "needs_human"
+    assert provider.last_user_prompt is not None
+    assert "No retrieved business evidence was found." in provider.last_user_prompt
+
+
+def test_business_fact_context_is_not_intent_gated(
+    business_profile: BusinessProfile,
+) -> None:
+    service, _ = _service()
+
+    fact_keys = {
+        item["metadata"]["fact_key"] for item in service._business_fact_context(business_profile)
+    }
+
+    assert "delivery_time" in fact_keys
+    assert "shipping_policy" in fact_keys
+    assert "return_policy" in fact_keys
+    assert "opening_hours" in fact_keys
+    assert "support_phone" in fact_keys
 
 
 def test_build_ai_reply_prompts_require_arabic_script_for_darija(
@@ -175,23 +265,8 @@ def test_build_ai_reply_prompts_require_arabic_script_for_darija(
         recent_messages=[],
         selected_sources=[],
         language_hint="darija",
-        intent_hint="livraison",
+        intent_hint="autre",
     )
 
     assert "Arabic script" in system_prompt
     assert "Do not use Latin transliteration" in system_prompt
-
-
-def test_rule_based_darija_contact_reply_uses_arabic_script(
-    business_profile: BusinessProfile,
-) -> None:
-    service = _service()
-    reply, _, _, _ = service._build_contact_reply(
-        business_profile,
-        "darija",
-        "فين العنوان؟",
-    )
-
-    assert reply.language == "darija"
-    assert "العنوان ديالنا هو" in (reply.reply_text or "")
-    assert "dyalna" not in (reply.reply_text or "")

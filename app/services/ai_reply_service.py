@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import json
 import logging
 from typing import Any
@@ -20,12 +19,7 @@ from app.schemas.ai import (
     AISourceReference,
 )
 from app.schemas.conversation import ConversationMessage
-from app.services.ai_helpers import (
-    infer_intent_hint,
-    is_order_management_request,
-    normalize_language_label,
-    source_preference,
-)
+from app.services.ai_helpers import normalize_language_label
 from app.services.ai_prompt_builder import PROMPT_VERSION, build_ai_reply_prompts
 from app.services.dashboard_service import business_row_to_profile, chat_row_to_message, to_iso
 from app.services.embedding_service import EmbeddingService
@@ -184,7 +178,7 @@ class AIReplyService:
         connection: dict[str, Any] | None,
         auto_send: bool,
     ) -> dict[str, Any]:
-        intent_hint = infer_intent_hint(customer_message)
+        intent_hint = "autre"
         language_hint, language_detection_payload = await self.llm_provider.detect_language(
             message=customer_message
         )
@@ -207,47 +201,37 @@ class AIReplyService:
                 phone=phone,
                 recent_messages_override=recent_messages_override,
             )
-            rule_based = self._maybe_rule_based_reply(
+            selected_context_items = await self._select_context(
+                business_id=business_id,
                 customer_message=customer_message,
                 business_profile=business_profile,
+            )
+            system_prompt, user_prompt = build_ai_reply_prompts(
+                business_profile=business_profile,
+                customer_message=customer_message,
+                recent_messages=recent_messages,
+                selected_sources=selected_context_items,
                 language_hint=language_hint,
                 intent_hint=intent_hint,
             )
-            if rule_based is not None:
-                reply, selected_context_items, request_payload, response_payload = rule_based
-            else:
-                selected_context_items = await self._select_context(
-                    business_id=business_id,
-                    customer_message=customer_message,
-                    intent_hint=intent_hint,
-                    business_profile=business_profile,
-                )
-                system_prompt, user_prompt = build_ai_reply_prompts(
-                    business_profile=business_profile,
-                    customer_message=customer_message,
-                    recent_messages=recent_messages,
-                    selected_sources=selected_context_items,
-                    language_hint=language_hint,
-                    intent_hint=intent_hint,
-                )
-                request_payload = {
-                    "system_prompt": system_prompt,
-                    "user_prompt": user_prompt,
-                    "prompt_version": PROMPT_VERSION,
-                }
-                logger.info(
-                    "AI retrieval assembled for business %s phone=%s intent_hint=%s language_hint=%s selected_sources=%d history_messages=%d",
-                    business_id,
-                    phone,
-                    intent_hint,
-                    language_hint,
-                    len(selected_context_items),
-                    len(recent_messages),
-                )
-                reply, response_payload = await self.llm_provider.generate_structured_reply(
-                    system_prompt=system_prompt,
-                    user_prompt=user_prompt,
-                )
+            request_payload = {
+                "system_prompt": system_prompt,
+                "user_prompt": user_prompt,
+                "prompt_version": PROMPT_VERSION,
+            }
+            logger.info(
+                "AI retrieval assembled for business %s phone=%s intent_hint=%s language_hint=%s selected_sources=%d history_messages=%d",
+                business_id,
+                phone,
+                intent_hint,
+                language_hint,
+                len(selected_context_items),
+                len(recent_messages),
+            )
+            reply, response_payload = await self.llm_provider.generate_structured_reply(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+            )
             retrieval_summary["selected_sources"] = [
                 self._source_to_summary(item) for item in selected_context_items
             ]
@@ -476,61 +460,11 @@ class AIReplyService:
             if row.get("text")
         ]
 
-    def _maybe_rule_based_reply(
-        self,
-        *,
-        customer_message: str,
-        business_profile,
-        language_hint: str,
-        intent_hint: str,
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]] | None:
-        normalized_language = normalize_language_label(language_hint, fallback="english")
-        if is_order_management_request(customer_message):
-            return self._build_order_handoff_reply(business_profile, normalized_language)
-
-        if (
-            intent_hint == "infos_boutique"
-            and business_profile.opening_hours
-            and self._asks_for_opening_hours(customer_message)
-        ):
-            return self._build_opening_hours_reply(
-                business_profile,
-                normalized_language,
-                customer_message,
-            )
-
-        if (
-            intent_hint == "infos_boutique"
-            and (business_profile.store_address or business_profile.support_phone or business_profile.whatsapp_number)
-            and self._asks_for_contact_or_location(customer_message)
-        ):
-            return self._build_contact_reply(
-                business_profile,
-                normalized_language,
-                customer_message,
-            )
-
-        if intent_hint == "retour" and (business_profile.return_policy or business_profile.return_window_days):
-            return self._build_return_policy_reply(business_profile, normalized_language)
-
-        if intent_hint == "livraison":
-            zone = self._find_delivery_zone(business_profile, customer_message)
-            if zone is not None:
-                return self._build_delivery_reply(
-                    business_profile,
-                    normalized_language,
-                    zone,
-                    include_tracking=self._asks_for_tracking(customer_message),
-                )
-
-        return None
-
     async def _select_context(
         self,
         *,
         business_id: int,
         customer_message: str,
-        intent_hint: str,
         business_profile,
     ) -> list[dict[str, Any]]:
         query_embedding = await self.embedding_service.embed_text(customer_message)
@@ -543,7 +477,7 @@ class AIReplyService:
         )
 
         grouped = {
-            "business_fact": self._business_fact_context(business_profile, intent_hint),
+            "business_fact": self._business_fact_context(business_profile),
             "product": [self._match_to_context(format_product_match(row), row) for row in product_rows if float(row["score"]) >= self.settings.search_min_score],
             "faq": [self._match_to_context(format_faq_match(row), row) for row in faq_rows if float(row["score"]) >= self.settings.search_min_score],
             "business_knowledge": [self._match_to_context(format_business_match(row), row) for row in knowledge_rows if float(row["score"]) >= self.settings.search_min_score],
@@ -552,72 +486,53 @@ class AIReplyService:
         selected: list[dict[str, Any]] = []
         seen: set[tuple[str, str]] = set()
 
-        for source_type in source_preference(intent_hint):
-            for item in grouped[source_type]:
+        source_order = ("business_fact", "faq", "business_knowledge", "product")
+        index = 0
+        while len(selected) < self.settings.ai_reply_max_context_items:
+            added = False
+            for source_type in source_order:
+                items = grouped[source_type]
+                if index >= len(items):
+                    continue
+                item = items[index]
                 key = (str(item["type"]), str(item["id"]))
                 if key in seen:
                     continue
                 selected.append(item)
                 seen.add(key)
+                added = True
                 if len(selected) >= self.settings.ai_reply_max_context_items:
                     return selected
-
-        for item in grouped["business_fact"]:
-            key = (str(item["type"]), str(item["id"]))
-            if key in seen:
-                continue
-            selected.append(item)
-            seen.add(key)
-            if len(selected) >= self.settings.ai_reply_max_context_items:
-                return selected
-
-        for source_type in ("product", "faq", "business_knowledge"):
-            for item in grouped[source_type]:
-                key = (str(item["type"]), str(item["id"]))
-                if key in seen:
-                    continue
-                selected.append(item)
-                seen.add(key)
-                if len(selected) >= self.settings.ai_reply_max_context_items:
-                    return selected
+            if not added:
+                break
+            index += 1
 
         return selected
 
-    def _business_fact_context(self, business_profile, intent_hint: str) -> list[dict[str, Any]]:
-        candidate_keys = {
-            "livraison": (
-                "delivery_zones",
-                "delivery_zone_details",
-                "delivery_time",
-                "delivery_tracking_method",
-                "shipping_policy",
-                "payment_methods",
-                "city",
-            ),
-            "paiement": ("payment_methods", "support_phone", "whatsapp_number"),
-            "retour": (
-                "return_policy",
-                "return_window_days",
-                "return_conditions",
-                "support_phone",
-                "whatsapp_number",
-            ),
-            "infos_produit": ("summary", "niche"),
-            "infos_boutique": (
-                "opening_hours",
-                "store_address",
-                "support_phone",
-                "whatsapp_number",
-                "support_email",
-                "city",
-                "summary",
-            ),
-            "autre": ("summary", "niche", "support_phone", "whatsapp_number"),
-        }.get(
-            intent_hint,
-            ("summary", "niche"),
+    def _business_fact_context(self, business_profile) -> list[dict[str, Any]]:
+        candidate_keys = (
+            "summary",
+            "niche",
+            "city",
+            "store_address",
+            "support_phone",
+            "whatsapp_number",
+            "support_email",
+            "opening_hours",
+            "delivery_zones",
+            "delivery_zone_details",
+            "delivery_time",
+            "delivery_tracking_method",
+            "shipping_policy",
+            "return_policy",
+            "return_window_days",
+            "return_conditions",
+            "payment_methods",
+            "supported_languages",
+            "order_rules",
+            "upsell_rules",
+            "escalation_contact",
         )
-
         items: list[dict[str, Any]] = []
         for key in candidate_keys:
             item = self._business_fact_item(business_profile, key)
@@ -672,349 +587,6 @@ class AIReplyService:
             score=float(source["score"]),
             metadata=dict(source.get("metadata") or {}),
         ).model_dump()
-
-    def _build_order_handoff_reply(
-        self, business_profile, language: str
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        sources = [
-            item
-            for item in (
-                self._business_fact_item(business_profile, "whatsapp_number"),
-                self._business_fact_item(business_profile, "support_phone"),
-                self._business_fact_item(business_profile, "support_email"),
-            )
-            if item is not None
-        ]
-        contact_line = self._format_contact_line(business_profile, language)
-        reply_text = {
-            "english": (
-                "Order management is handled by our support team, not directly in this chat. "
-                f"Please contact support for order status, changes, cancellations, or complaints. {contact_line}"
-            ),
-            "french": (
-                "La gestion des commandes est prise en charge par notre équipe support, pas directement dans ce chat. "
-                f"Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. {contact_line}"
-            ),
-            "darija": (
-                "تدبير الطلبات كيديرو الدعم، ماشي مباشرة من هاد الشات. "
-                f"إلا بغيتي التتبع أو تعديل أو إلغاء أو شكاية، تواصل مع الدعم. {contact_line}"
-            ),
-        }[language]
-        return self._compose_rule_based_reply(
-            reply_text=reply_text,
-            intent="autre",
-            language=language,
-            used_sources=sources,
-            grounded=True,
-            needs_human=True,
-            confidence=0.98,
-            reason_code="order_handoff",
-            strategy="rule_based_order_handoff",
-        )
-
-    def _build_opening_hours_reply(
-        self,
-        business_profile,
-        language: str,
-        customer_message: str,
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        opening_hours = business_profile.opening_hours or []
-        normalized = customer_message.lower()
-        if any(token in normalized for token in ("monday", "friday", "lundi", "vendredi", "weekday")):
-            selected_hours = [
-                item for item in opening_hours if item.lower().startswith("monday")
-            ] or opening_hours
-        elif any(token in normalized for token in ("saturday", "sunday", "samedi", "السبت", "الأحد")):
-            selected_hours = [
-                item
-                for item in opening_hours
-                if item.lower().startswith("saturday") or item.lower().startswith("sunday")
-            ] or opening_hours
-        else:
-            selected_hours = opening_hours
-        hours_line = ", ".join(selected_hours)
-        reply_text = {
-            "english": f"We are open {hours_line}.",
-            "french": f"Nos horaires sont les suivants: {hours_line}.",
-            "darija": f"أوقات الخدمة ديالنا هي: {hours_line}.",
-        }[language]
-        sources = [
-            item
-            for item in (
-                self._business_fact_item(business_profile, "opening_hours"),
-            )
-            if item is not None
-        ]
-        return self._compose_rule_based_reply(
-            reply_text=reply_text,
-            intent="infos_boutique",
-            language=language,
-            used_sources=sources,
-            grounded=True,
-            needs_human=False,
-            confidence=0.99,
-            reason_code="rule_based_opening_hours",
-            strategy="rule_based_opening_hours",
-        )
-
-    def _build_contact_reply(
-        self,
-        business_profile,
-        language: str,
-        customer_message: str,
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        wants_phone = any(token in customer_message.lower() for token in ("phone", "tel", "telephone", "numéro", "numero", "رقم"))
-        wants_whatsapp = "whatsapp" in customer_message.lower()
-        wants_email = "email" in customer_message.lower() or "mail" in customer_message.lower()
-
-        channels = self._contact_channels(business_profile)
-        requested_channels = []
-        if wants_phone and channels["phone"]:
-            requested_channels.append(("Phone", channels["phone"]))
-        if wants_whatsapp and channels["whatsapp"]:
-            requested_channels.append(("WhatsApp", channels["whatsapp"]))
-        if wants_email and channels["email"]:
-            requested_channels.append(("Email", channels["email"]))
-        if not requested_channels:
-            requested_channels = [
-                (label, value)
-                for label, value in (
-                    ("Phone", channels["phone"]),
-                    ("WhatsApp", channels["whatsapp"]),
-                    ("Email", channels["email"]),
-                )
-                if value
-            ]
-
-        address = business_profile.store_address or business_profile.city
-        channels_text = "; ".join(f"{label}: {value}" for label, value in requested_channels)
-        reply_text = {
-            "english": f"Our store address is {address}. {channels_text}",
-            "french": f"Notre adresse est {address}. {channels_text}",
-            "darija": f"العنوان ديالنا هو {address}. {channels_text}",
-        }[language]
-        sources = [
-            item
-            for item in (
-                self._business_fact_item(business_profile, "store_address"),
-                self._business_fact_item(business_profile, "support_phone"),
-                self._business_fact_item(business_profile, "whatsapp_number"),
-                self._business_fact_item(business_profile, "support_email"),
-            )
-            if item is not None
-        ]
-        return self._compose_rule_based_reply(
-            reply_text=reply_text,
-            intent="infos_boutique",
-            language=language,
-            used_sources=sources,
-            grounded=True,
-            needs_human=False,
-            confidence=0.99,
-            reason_code="rule_based_contact",
-            strategy="rule_based_contact",
-        )
-
-    def _build_return_policy_reply(
-        self, business_profile, language: str
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        conditions = " ".join(business_profile.return_conditions)
-        if language == "english":
-            reply_text = (
-                f"You can return an item within {business_profile.return_window_days} days. "
-                f"{conditions}"
-            ).strip()
-        elif language == "french":
-            reply_text = (
-                f"Vous pouvez retourner un produit sous {business_profile.return_window_days} jours. "
-                f"{conditions}"
-            ).strip()
-        else:
-            reply_text = (
-                f"تقدر ترجع المنتج فـ {business_profile.return_window_days} أيام. "
-                f"{conditions}"
-            ).strip()
-        sources = [
-            item
-            for item in (
-                self._business_fact_item(business_profile, "return_window_days"),
-                self._business_fact_item(business_profile, "return_conditions"),
-                self._business_fact_item(business_profile, "return_policy"),
-            )
-            if item is not None
-        ]
-        return self._compose_rule_based_reply(
-            reply_text=reply_text,
-            intent="retour",
-            language=language,
-            used_sources=sources,
-            grounded=True,
-            needs_human=False,
-            confidence=0.99,
-            reason_code="rule_based_return_policy",
-            strategy="rule_based_return_policy",
-        )
-
-    def _build_delivery_reply(
-        self,
-        business_profile,
-        language: str,
-        zone: dict[str, Any],
-        *,
-        include_tracking: bool,
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        city = zone["city"]
-        fee = zone["fee_mad"]
-        eta = zone["estimated_time"]
-        tracking_line = ""
-        if include_tracking and business_profile.delivery_tracking_method:
-            tracking_line = {
-                "english": f" Tracking is available: {business_profile.delivery_tracking_method}",
-                "french": f" Le suivi est disponible: {business_profile.delivery_tracking_method}",
-                "darija": f" كاين التتبع: {business_profile.delivery_tracking_method}",
-            }[language]
-        reply_text = {
-            "english": f"Yes, we deliver to {city} for {fee} MAD, with an estimated time of {eta}.{tracking_line}",
-            "french": f"Oui, nous livrons à {city} pour {fee} MAD, avec un délai estimé de {eta}.{tracking_line}",
-            "darija": f"إييه، كنديرو التوصيل ل {city} ب {fee} MAD، والمدة تقريباً {eta}.{tracking_line}",
-        }[language]
-        sources = [
-            item
-            for item in (
-                self._business_fact_item(business_profile, "delivery_zone_details"),
-                self._business_fact_item(business_profile, "delivery_tracking_method"),
-            )
-            if item is not None
-        ]
-        return self._compose_rule_based_reply(
-            reply_text=reply_text,
-            intent="livraison",
-            language=language,
-            used_sources=sources,
-            grounded=True,
-            needs_human=False,
-            confidence=0.99,
-            reason_code="rule_based_delivery",
-            strategy="rule_based_delivery",
-        )
-
-    def _compose_rule_based_reply(
-        self,
-        *,
-        reply_text: str,
-        intent: str,
-        language: str,
-        used_sources: list[dict[str, Any]],
-        grounded: bool,
-        needs_human: bool,
-        confidence: float,
-        reason_code: str,
-        strategy: str,
-    ) -> tuple[AIModelReply, list[dict[str, Any]], dict[str, Any], dict[str, Any]]:
-        reply = AIModelReply(
-            reply_text=reply_text,
-            intent=intent,
-            language=language,
-            grounded=grounded,
-            needs_human=needs_human,
-            confidence=confidence,
-            reason_code=reason_code,
-            used_sources=[
-                AISourceReference(
-                    type=item["type"],
-                    id=item["id"],
-                    name=item["name"],
-                    score=float(item["score"]),
-                    metadata=dict(item.get("metadata") or {}),
-                )
-                for item in used_sources
-            ],
-        )
-        return (
-            reply,
-            used_sources,
-            {"strategy": strategy, "prompt_version": PROMPT_VERSION},
-            {"strategy": strategy, "structured_reply": reply.model_dump(mode="json")},
-        )
-
-    def _asks_for_opening_hours(self, message: str) -> bool:
-        normalized = message.lower()
-        return any(
-            token in normalized
-            for token in (
-                "open",
-                "close",
-                "opening",
-                "hours",
-                "horaire",
-                "horaires",
-                "ouvre",
-                "samedi",
-                "sunday",
-                "السبت",
-                "الأحد",
-            )
-        )
-
-    def _asks_for_contact_or_location(self, message: str) -> bool:
-        normalized = message.lower()
-        return any(
-            token in normalized
-            for token in (
-                "address",
-                "adresse",
-                "store",
-                "magasin",
-                "phone",
-                "telephone",
-                "numéro",
-                "numero",
-                "whatsapp",
-                "email",
-                "contact",
-                "location",
-                "فين",
-                "adresse",
-            )
-        )
-
-    def _asks_for_tracking(self, message: str) -> bool:
-        normalized = message.lower()
-        return any(token in normalized for token in ("tracking", "suivi", "ntb3", "نتبع", "colis"))
-
-    def _find_delivery_zone(self, business_profile, message: str) -> dict[str, Any] | None:
-        normalized = message.lower()
-        aliases = {"tanger": "Tangier", "casa": "Casablanca"}
-        for zone in business_profile.delivery_zone_details:
-            city = str(zone.get("city") or "")
-            if city and city.lower() in normalized:
-                return zone
-        for alias, city in aliases.items():
-            if alias in normalized:
-                return next(
-                    (zone for zone in business_profile.delivery_zone_details if zone.get("city") == city),
-                    None,
-                )
-        return None
-
-    def _contact_channels(self, business_profile) -> dict[str, str | None]:
-        return {
-            "phone": business_profile.support_phone,
-            "whatsapp": business_profile.whatsapp_number,
-            "email": business_profile.support_email,
-        }
-
-    def _format_contact_line(self, business_profile, language: str) -> str:
-        channels = self._contact_channels(business_profile)
-        pairs = [f"WhatsApp: {channels['whatsapp']}" if channels["whatsapp"] else None]
-        pairs.append(f"Phone: {channels['phone']}" if channels["phone"] else None)
-        pairs.append(f"Email: {channels['email']}" if channels["email"] else None)
-        details = "; ".join(item for item in pairs if item)
-        if language == "french":
-            return f"Contacts support: {details}"
-        if language == "darija":
-            return f"جهات التواصل مع الدعم: {details}"
-        return f"Support contacts: {details}"
 
     async def _send_generated_reply(
         self,

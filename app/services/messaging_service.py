@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.conversation import ConversationReplyRequest
 from app.schemas.integration import WhatsAppConnectRequest
-from app.services.ai_helpers import is_order_management_request, normalize_language_label
+from app.services.ai_helpers import normalize_language_label
 from app.services.ai_reply_service import AIReplyService
 from app.services.dashboard_service import build_whatsapp_integration, chat_row_to_message, to_iso
 from app.services.messaging_provider import AbstractMessagingProvider
@@ -452,36 +452,21 @@ class MessagingService:
         normalized = message.strip().lower()
         if not normalized:
             return False
-        if is_order_management_request(normalized):
+        if self._looks_like_finalized_order_mutation(message):
             return True
         if any(
             token in normalized
             for token in (
-                "change",
-                "edit",
-                "modify",
-                "address",
-                "adresse",
-                "city",
-                "ville",
-                "quantity",
-                "variant",
-                "color",
-                "cancel",
-                "annuler",
-                "confirm",
+                "order",
+                "commande",
+                "طلب",
                 "status",
                 "where is",
                 "delivery",
-                "بدل",
-                "تعديل",
-                "العنوان",
-                "المدينة",
-                "الكمية",
-                "اللون",
-                "إلغاء",
-                "تأكيد",
-                "الطلب",
+                "tracking",
+                "suivi",
+                "حالة",
+                "تتبع",
             )
         ):
             return True
