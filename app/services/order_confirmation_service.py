@@ -234,10 +234,10 @@ class OrderConfirmationService:
     ) -> bool:
         business_id = int(connection["business_id"])
         phone = str(inbound_row.get("phone") or "")
-        session_row = await self.order_confirmation_repository.find_active_session(
+        session_row = await self.order_confirmation_repository.find_latest_by_phone(
             business_id, phone
         )
-        if session_row is None:
+        if session_row is None or session_row.get("status") not in ACTIVE_SESSION_STATUSES:
             return False
 
         message_text = str(inbound_row.get("text") or "")

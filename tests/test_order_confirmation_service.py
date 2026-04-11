@@ -286,6 +286,7 @@ class FakeOrderRepository:
 class FakeOrderConfirmationRepository:
     def __init__(self) -> None:
         self.session = None
+        self.latest_session = None
         self.events: list[dict] = []
         self.claim_result = True
 
@@ -337,6 +338,9 @@ class FakeOrderConfirmationRepository:
 
     async def find_active_session(self, business_id: int, phone: str):
         return self.session
+
+    async def find_latest_by_phone(self, business_id: int, phone: str):
+        return self.latest_session if self.latest_session is not None else self.session
 
     async def get_session(self, business_id: int, session_id: int):
         return self.session
@@ -1500,6 +1504,93 @@ def test_ingest_store_order_does_not_reopen_terminal_shopify_session() -> None:
     assert result["session"]["status"] == "confirmed"
     assert order_repository.row["customer_name"] == "Lina"
     assert not chat_repository.messages
+
+
+def test_handle_inbound_message_ignores_older_pending_session_when_latest_session_is_terminal() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    confirmation_repository.session = {
+        "id": 21,
+        "business_id": 2,
+        "order_id": 10,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "french",
+        "status": "awaiting_customer",
+        "needs_human": False,
+        "last_detected_intent": "order_confirmation_pending",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": None,
+        "confirmed_at": None,
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {"preferred_language": "french"},
+    }
+    confirmation_repository.latest_session = {
+        "id": 22,
+        "business_id": 2,
+        "order_id": 11,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "french",
+        "status": "confirmed",
+        "needs_human": False,
+        "last_detected_intent": "customer_confirmed",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": datetime.now(UTC),
+        "confirmed_at": datetime.now(UTC),
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {"preferred_language": "french"},
+    }
+    order_repository.row = {
+        "id": 10,
+        "business_id": 2,
+        "source_store": "shopify",
+        "external_order_id": "WC-1001",
+        "customer_name": "Lina",
+        "customer_phone": "+212600000001",
+        "preferred_language": "french",
+        "total_amount": 3499,
+        "currency": "MAD",
+        "payment_method": "cash_on_delivery",
+        "delivery_city": "Casablanca",
+        "delivery_address": "Maarif",
+        "order_notes": None,
+        "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+        "metadata": {},
+        "raw_payload": {},
+        "status": "pending_confirmation",
+        "confirmation_status": "awaiting_customer",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    _seed_inbound(chat_repository, 2, "+212600000001", "2")
+
+    import asyncio
+
+    handled = asyncio.run(
+        service.handle_inbound_message(
+            connection={
+                "business_id": 2,
+                "config": {
+                    "provider": "twilio",
+                    "onboarding_status": "connected",
+                    "subaccount_sid": "AC123",
+                    "sender_sid": "PN123",
+                    "whatsapp_number": "+14155238886",
+                },
+            },
+            inbound_row={
+                "id": 61,
+                "phone": "+212600000001",
+                "text": "2",
+            },
+        )
+    )
+
+    assert handled is False
+    assert confirmation_repository.session["status"] == "awaiting_customer"
+    assert len(confirmation_repository.events) == 0
 
 
 def test_ingest_store_order_rejects_non_integration_sources() -> None:
