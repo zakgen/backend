@@ -122,16 +122,29 @@ class FakeLLMProvider:
 
 
 class FakeBusinessRepository:
-    def __init__(self, default_language: str | None = "french") -> None:
+    def __init__(
+        self,
+        default_language: str | None = "french",
+        *,
+        city: str = "Casablanca",
+        delivery_zones: list[str] | None = None,
+        delivery_zone_details: list[dict] | None = None,
+    ) -> None:
         self.default_language = default_language
+        self.city = city
+        self.delivery_zones = delivery_zones or ["Casablanca", "Rabat"]
+        self.delivery_zone_details = delivery_zone_details or [{"city": "Casablanca"}, {"city": "Rabat"}]
 
     async def get_by_id(self, business_id: int):
         profile_metadata = {}
         if self.default_language is not None:
             profile_metadata["default_language"] = self.default_language
+        profile_metadata["delivery_zone_details"] = self.delivery_zone_details
         return {
             "id": business_id,
             "name": "Atlas Gadget Hub",
+            "city": self.city,
+            "delivery_zones": self.delivery_zones,
             "profile_metadata": profile_metadata,
         }
 
@@ -330,6 +343,9 @@ class FakeOrderConfirmationRepository:
 def _build_service(
     *,
     business_default_language: str | None = "french",
+    business_city: str = "Casablanca",
+    business_delivery_zones: list[str] | None = None,
+    business_delivery_zone_details: list[dict] | None = None,
 ) -> tuple[OrderConfirmationService, FakeChatRepository, FakeOrderRepository, FakeOrderConfirmationRepository]:
     session = type("DummyRepoSession", (), {"db": None})()
     service = OrderConfirmationService(
@@ -337,7 +353,12 @@ def _build_service(
         messaging_provider=FakeProvider(),
         llm_provider=FakeLLMProvider(),
     )
-    service.business_repository = FakeBusinessRepository(business_default_language)
+    service.business_repository = FakeBusinessRepository(
+        business_default_language,
+        city=business_city,
+        delivery_zones=business_delivery_zones,
+        delivery_zone_details=business_delivery_zone_details,
+    )
     service.integration_repository = FakeIntegrationRepository()
     chat_repository = FakeChatRepository()
     service.chat_repository = chat_repository
@@ -720,6 +741,100 @@ def test_handle_inbound_custom_edit_reply_uses_ai_interpretation() -> None:
     assert service.llm_provider.detect_calls == []
 
 
+def test_delivery_address_edit_updates_known_city_from_address() -> None:
+    service, _, order_repository, _ = _build_service()
+
+    snapshot, _, updated_snapshot = service._apply_interpreted_edits_to_snapshot(
+        business_row={
+            "city": "Casablanca",
+            "delivery_zones": ["Casablanca", "Rabat"],
+            "profile_metadata": {"delivery_zone_details": [{"city": "Casablanca"}]},
+        },
+        snapshot={
+            "delivery_city": "Rabat",
+            "delivery_address": "Agdal",
+        },
+        order_row={
+            "delivery_city": "Rabat",
+            "delivery_address": "Agdal",
+            "items": order_repository.row.get("items") if order_repository.row else [],
+        },
+        interpretation=OrderSessionInterpretation(
+            language="french",
+            primary_action="edit_request",
+            confidence=0.9,
+            edits=[{"field": "delivery_address", "value": "Hay Hassani, Casablanca"}],
+        ),
+    )
+
+    assert snapshot[0]["field"] == "delivery_address"
+    assert updated_snapshot["delivery_address"] == "Hay Hassani, Casablanca"
+    assert updated_snapshot["delivery_city"] == "Casablanca"
+
+
+def test_delivery_address_edit_updates_city_even_if_outside_business_zones() -> None:
+    service, _, order_repository, _ = _build_service(
+        business_delivery_zones=["Casablanca", "Rabat"],
+        business_delivery_zone_details=[{"city": "Casablanca"}, {"city": "Rabat"}],
+    )
+
+    _, _, updated_snapshot = service._apply_interpreted_edits_to_snapshot(
+        business_row={
+            "city": "Casablanca",
+            "delivery_zones": ["Casablanca", "Rabat"],
+            "profile_metadata": {"delivery_zone_details": [{"city": "Casablanca"}, {"city": "Rabat"}]},
+        },
+        snapshot={
+            "delivery_city": "Casablanca",
+            "delivery_address": "Maarif",
+        },
+        order_row={
+            "delivery_city": "Casablanca",
+            "delivery_address": "Maarif",
+            "items": order_repository.row.get("items") if order_repository.row else [],
+        },
+        interpretation=OrderSessionInterpretation(
+            language="french",
+            primary_action="edit_request",
+            confidence=0.9,
+            edits=[{"field": "delivery_address", "value": "Rue X, Tanger"}],
+        ),
+    )
+
+    assert updated_snapshot["delivery_address"] == "Rue X, Tanger"
+    assert updated_snapshot["delivery_city"] == "Tanger"
+
+
+def test_delivery_address_edit_without_clear_city_keeps_existing_city() -> None:
+    service, _, order_repository, _ = _build_service()
+
+    _, _, updated_snapshot = service._apply_interpreted_edits_to_snapshot(
+        business_row={
+            "city": "Casablanca",
+            "delivery_zones": ["Casablanca", "Rabat"],
+            "profile_metadata": {"delivery_zone_details": [{"city": "Casablanca"}, {"city": "Rabat"}]},
+        },
+        snapshot={
+            "delivery_city": "Casablanca",
+            "delivery_address": "Maarif",
+        },
+        order_row={
+            "delivery_city": "Casablanca",
+            "delivery_address": "Maarif",
+            "items": order_repository.row.get("items") if order_repository.row else [],
+        },
+        interpretation=OrderSessionInterpretation(
+            language="french",
+            primary_action="edit_request",
+            confidence=0.9,
+            edits=[{"field": "delivery_address", "value": "Residence Al Amal, Apt 4"}],
+        ),
+    )
+
+    assert updated_snapshot["delivery_address"] == "Residence Al Amal, Apt 4"
+    assert updated_snapshot["delivery_city"] == "Casablanca"
+
+
 def test_handle_inbound_delivery_question_answers_without_handoff() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
     confirmation_repository.session = {
@@ -865,9 +980,70 @@ def test_handle_inbound_quantity_edit_stays_automated_until_final_confirmation()
     assert handled is True
     assert confirmation_repository.session["status"] == "awaiting_customer"
     assert confirmation_repository.session["structured_snapshot"]["items"][0]["quantity"] == 3
+    assert confirmation_repository.session["structured_snapshot"]["total_amount"] == 300.0
     assert confirmation_repository.session["structured_snapshot"]["awaiting_final_confirmation_after_edits"] is True
     assert "Updated order summary" in chat_repository.messages[1]["text"]
     assert "Reply 1 to confirm the updated order" in chat_repository.messages[1]["text"]
+
+
+def test_quantity_edit_recalculates_snapshot_total() -> None:
+    service, _, order_repository, _ = _build_service()
+
+    _, _, updated_snapshot = service._apply_interpreted_edits_to_snapshot(
+        business_row={
+            "city": "Casablanca",
+            "delivery_zones": ["Casablanca"],
+            "profile_metadata": {"delivery_zone_details": [{"city": "Casablanca"}]},
+        },
+        snapshot={
+            "items": [{"product_name": "Redmi Note 13", "quantity": 1, "unit_price": 100.0}],
+            "currency": "MAD",
+            "total_amount": 100.0,
+        },
+        order_row={
+            "items": [{"product_name": "Redmi Note 13", "quantity": 1, "unit_price": 100.0}],
+            "total_amount": 100.0,
+        },
+        interpretation=OrderSessionInterpretation(
+            language="english",
+            primary_action="edit_request",
+            confidence=0.9,
+            edits=[{"field": "quantity", "value": "3"}],
+        ),
+    )
+
+    assert updated_snapshot["items"][0]["quantity"] == 3
+    assert updated_snapshot["total_amount"] == 300.0
+
+
+def test_quantity_edit_keeps_existing_total_when_prices_are_missing() -> None:
+    service, _, order_repository, _ = _build_service()
+
+    _, _, updated_snapshot = service._apply_interpreted_edits_to_snapshot(
+        business_row={
+            "city": "Casablanca",
+            "delivery_zones": ["Casablanca"],
+            "profile_metadata": {"delivery_zone_details": [{"city": "Casablanca"}]},
+        },
+        snapshot={
+            "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+            "currency": "MAD",
+            "total_amount": 100.0,
+        },
+        order_row={
+            "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+            "total_amount": 100.0,
+        },
+        interpretation=OrderSessionInterpretation(
+            language="english",
+            primary_action="edit_request",
+            confidence=0.9,
+            edits=[{"field": "quantity", "value": "3"}],
+        ),
+    )
+
+    assert updated_snapshot["items"][0]["quantity"] == 3
+    assert updated_snapshot["total_amount"] == 100.0
 
 
 def test_final_confirmation_after_edits_marks_order_confirmed() -> None:

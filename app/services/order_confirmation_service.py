@@ -225,6 +225,7 @@ class OrderConfirmationService:
             or snapshot.get("preferred_language"),
             "darija",
         )
+        business_row = await self.business_repository.get_by_id(business_id)
         order_row = await self.order_repository.get_by_id(
             business_id, int(session_row["order_id"])
         )
@@ -305,6 +306,7 @@ class OrderConfirmationService:
                 finalized_order,
             ) = self._apply_ai_interpretation(
                 interpretation=interpretation,
+                business_row=business_row,
                 session_row=session_row,
                 order_row=order_row,
                 snapshot=snapshot,
@@ -436,6 +438,7 @@ class OrderConfirmationService:
         self,
         *,
         interpretation: OrderSessionInterpretation,
+        business_row: dict[str, Any],
         session_row: dict[str, Any],
         order_row: dict[str, Any],
         snapshot: dict[str, Any],
@@ -450,6 +453,7 @@ class OrderConfirmationService:
         finalized_order: dict[str, Any] | None = None
         needs_human = interpretation.needs_human or interpretation.confidence < 0.55
         applied_edits, ambiguous_edits, snapshot = self._apply_interpreted_edits_to_snapshot(
+            business_row=business_row,
             snapshot=snapshot,
             order_row=order_row,
             interpretation=interpretation,
@@ -1358,6 +1362,7 @@ class OrderConfirmationService:
     def _apply_interpreted_edits_to_snapshot(
         self,
         *,
+        business_row: dict[str, Any],
         snapshot: dict[str, Any],
         order_row: dict[str, Any],
         interpretation: OrderSessionInterpretation,
@@ -1384,6 +1389,12 @@ class OrderConfirmationService:
                 applied_successfully = True
             elif edit.field == "delivery_address":
                 updated_snapshot["delivery_address"] = edit.value
+                inferred_city = self._infer_delivery_city_from_address(
+                    address=edit.value,
+                    business_row=business_row,
+                )
+                if inferred_city:
+                    updated_snapshot["delivery_city"] = inferred_city
                 applied_successfully = True
             elif edit.field == "customer_phone":
                 updated_snapshot["customer_phone"] = edit.value
@@ -1410,8 +1421,113 @@ class OrderConfirmationService:
             else:
                 ambiguous.append(normalized_edit)
 
+        recalculated_total = self._calculate_snapshot_total(updated_snapshot)
+        if recalculated_total is not None:
+            updated_snapshot["total_amount"] = recalculated_total
+
         updated_snapshot["pending_edits"] = pending_edits
         return applied, ambiguous, updated_snapshot
+
+    def _infer_delivery_city_from_address(
+        self,
+        *,
+        address: str,
+        business_row: dict[str, Any],
+    ) -> str | None:
+        normalized_address = self._normalize_city_token(address)
+        if not normalized_address:
+            return None
+
+        business_candidates = self._business_city_candidates(business_row)
+        for candidate in business_candidates:
+            normalized_candidate = self._normalize_city_token(candidate)
+            if normalized_candidate and self._address_contains_city(
+                normalized_address=normalized_address,
+                normalized_city=normalized_candidate,
+            ):
+                return candidate
+
+        fallback_cities = (
+            "Casablanca",
+            "Rabat",
+            "Sale",
+            "Salé",
+            "Tanger",
+            "Tangier",
+            "Marrakech",
+            "Marrakesh",
+            "Fes",
+            "Fès",
+            "Agadir",
+            "Tetouan",
+            "Tétouan",
+            "Kenitra",
+            "Kénitra",
+            "Meknes",
+            "Meknès",
+            "Oujda",
+            "El Jadida",
+            "Safi",
+            "Mohammedia",
+            "Beni Mellal",
+            "Béni Mellal",
+            "Nador",
+            "Khouribga",
+        )
+        matches = [
+            city
+            for city in fallback_cities
+            if self._address_contains_city(
+                normalized_address=normalized_address,
+                normalized_city=self._normalize_city_token(city),
+            )
+        ]
+        if len(matches) == 1:
+            return matches[0]
+        return None
+
+    def _business_city_candidates(self, business_row: dict[str, Any]) -> list[str]:
+        metadata = dict(business_row.get("profile_metadata") or {})
+        candidates: list[str] = []
+        for value in [business_row.get("city"), *(business_row.get("delivery_zones") or [])]:
+            text = str(value or "").strip()
+            if text and text not in candidates:
+                candidates.append(text)
+        for zone in metadata.get("delivery_zone_details") or []:
+            if not isinstance(zone, dict):
+                continue
+            text = str(zone.get("city") or "").strip()
+            if text and text not in candidates:
+                candidates.append(text)
+        return candidates
+
+    def _address_contains_city(self, *, normalized_address: str, normalized_city: str) -> bool:
+        if not normalized_city:
+            return False
+        city_tokens = [token for token in normalized_city.split() if token]
+        if not city_tokens:
+            return False
+        if len(city_tokens) == 1:
+            return city_tokens[0] in normalized_address.split()
+        return normalized_city in normalized_address
+
+    def _normalize_city_token(self, value: str) -> str:
+        normalized = (
+            value.lower()
+            .replace("é", "e")
+            .replace("è", "e")
+            .replace("ê", "e")
+            .replace("à", "a")
+            .replace("â", "a")
+            .replace("î", "i")
+            .replace("ï", "i")
+            .replace("ô", "o")
+            .replace("ù", "u")
+            .replace("û", "u")
+            .replace("-", " ")
+            .replace(",", " ")
+        )
+        return " ".join(normalized.split())
 
     def _build_snapshot_confirmation_summary(self, language: str, snapshot: dict[str, Any]) -> str:
         items = snapshot.get("items") or []
