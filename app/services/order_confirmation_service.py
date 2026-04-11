@@ -65,7 +65,8 @@ class OrderConfirmationService:
                 "confirmation_status": "pending_send",
             },
         )
-        snapshot = self._build_snapshot(business_row, order_row)
+        business_language = self._resolve_order_confirmation_language(business_row)
+        snapshot = self._build_snapshot(business_row, order_row, business_language=business_language)
         session_row = await self.order_confirmation_repository.find_latest_by_order(
             business_id, int(order_row["id"])
         )
@@ -75,7 +76,7 @@ class OrderConfirmationService:
                 order_id=int(order_row["id"]),
                 phone=str(order_row["customer_phone"]),
                 customer_name=order_row.get("customer_name"),
-                preferred_language=order_row.get("preferred_language"),
+                preferred_language=business_language,
                 status_value="pending_send",
                 needs_human=False,
                 last_detected_intent="order_confirmation_pending",
@@ -95,7 +96,7 @@ class OrderConfirmationService:
             session_row = await self.order_confirmation_repository.update_session(
                 int(session_row["id"]),
                 {
-                    "preferred_language": order_row.get("preferred_language"),
+                    "preferred_language": business_language,
                     "structured_snapshot": snapshot,
                     "last_detected_intent": "order_confirmation_refreshed",
                 },
@@ -137,7 +138,7 @@ class OrderConfirmationService:
                 order_row.get("customer_phone"),
             )
             connection = await self._get_ready_whatsapp_connection(business_id)
-            language = normalize_language_label(order_row.get("preferred_language"), "french")
+            language = business_language
             confirmation_message = self._build_initial_confirmation_message(
                 business_name=str(business_row.get("name") or ""),
                 order_row=order_row,
@@ -222,29 +223,13 @@ class OrderConfirmationService:
         session_language = normalize_language_label(
             session_row.get("preferred_language")
             or snapshot.get("preferred_language"),
-            "french",
+            "darija",
         )
         order_row = await self.order_repository.get_by_id(
             business_id, int(session_row["order_id"])
         )
         action = self._detect_customer_action(message_text)
-        should_detect_language = action is None and self._should_detect_language_for_message(
-            message_text
-        )
         language = session_language
-        should_persist_language = False
-        if should_detect_language:
-            try:
-                detected_language, _ = await self.llm_provider.detect_language(
-                    message=message_text
-                )
-            except Exception:
-                detected_language = session_language
-            language = normalize_language_label(
-                detected_language,
-                fallback=session_language,
-            )
-            should_persist_language = language != session_language
         interpretation: OrderSessionInterpretation | None = None
         if action is None:
             interpretation = await self._interpret_session_message(
@@ -253,23 +238,11 @@ class OrderConfirmationService:
                 order_row=order_row,
                 snapshot=snapshot,
             )
-            interpreted_language = normalize_language_label(
-                interpretation.language,
-                fallback=language,
-            )
-            if should_detect_language:
-                language = interpreted_language
-                should_persist_language = language != session_language
-        if should_persist_language:
-            snapshot["preferred_language"] = language
         session_update: dict[str, Any] = {
             "last_customer_message_at": datetime.now(UTC),
             "last_detected_intent": action
             or (interpretation.primary_action if interpretation is not None else "free_text"),
         }
-        if should_persist_language:
-            session_update["preferred_language"] = language
-            session_update["structured_snapshot"] = snapshot
         order_status = order_row.get("status") or "pending_confirmation"
         confirmation_status = order_row.get("confirmation_status") or session_row["status"]
         finalized_order: dict[str, Any] | None = None
@@ -679,7 +652,11 @@ class OrderConfirmationService:
         order_row = await self.order_repository.get_by_id(
             business_id, int(session_row["order_id"])
         )
-        language = normalize_language_label(session_row.get("preferred_language"), "french")
+        business_row = await self.business_repository.get_by_id(business_id)
+        language = normalize_language_label(
+            session_row.get("preferred_language"),
+            self._resolve_order_confirmation_language(business_row),
+        )
         action = payload.action
         update_payload: dict[str, Any]
         order_status: str
@@ -726,7 +703,6 @@ class OrderConfirmationService:
             event_type = "admin_reopened"
         elif action == "resend":
             connection = await self._get_ready_whatsapp_connection(business_id)
-            business_row = await self.business_repository.get_by_id(business_id)
             confirmation_message = self._build_initial_confirmation_message(
                 business_name=str(business_row.get("name") or ""),
                 order_row=order_row,
@@ -979,13 +955,19 @@ class OrderConfirmationService:
                 return None
         return None
 
-    def _build_snapshot(self, business_row: dict[str, Any], order_row: dict[str, Any]) -> dict[str, Any]:
+    def _build_snapshot(
+        self,
+        business_row: dict[str, Any],
+        order_row: dict[str, Any],
+        *,
+        business_language: str,
+    ) -> dict[str, Any]:
         return {
             "business_name": business_row.get("name"),
             "external_order_id": order_row.get("external_order_id"),
             "customer_name": order_row.get("customer_name"),
             "customer_phone": order_row.get("customer_phone"),
-            "preferred_language": order_row.get("preferred_language"),
+            "preferred_language": business_language,
             "delivery_city": order_row.get("delivery_city"),
             "delivery_address": order_row.get("delivery_address"),
             "total_amount": float(order_row.get("total_amount") or 0),
@@ -994,6 +976,16 @@ class OrderConfirmationService:
             "payment_method": order_row.get("payment_method"),
             "order_notes": order_row.get("order_notes"),
         }
+
+    def _resolve_business_default_language(self, business_row: dict[str, Any]) -> str:
+        metadata = dict(business_row.get("profile_metadata") or {})
+        return normalize_language_label(metadata.get("default_language"), "darija")
+
+    def _resolve_order_confirmation_language(self, business_row: dict[str, Any]) -> str:
+        business_default_language = self._resolve_business_default_language(business_row)
+        if business_default_language == "french":
+            return "french"
+        return "darija"
 
     def _resolve_confirmation_template_sid(self, language: str) -> str:
         if language == "french":
@@ -1255,38 +1247,6 @@ class OrderConfirmationService:
         if normalized in {"4", "agent", "support", "human", "personne", "call me", "n3ayet", "اتصل"}:
             return "request_human"
         return None
-
-    def _should_detect_language_for_message(self, message: str) -> bool:
-        normalized = message.strip().lower()
-        if not normalized:
-            return False
-        if normalized in {"1", "2", "3", "4"}:
-            return False
-        weak_acknowledgements = {
-            "ok",
-            "okay",
-            "yes",
-            "oui",
-            "no",
-            "non",
-            "merci",
-            "thanks",
-            "thank you",
-            "wakha",
-            "safi",
-            "تمام",
-            "نعم",
-            "لا",
-        }
-        if normalized in weak_acknowledgements:
-            return False
-        alpha_chars = sum(1 for char in normalized if char.isalpha())
-        word_count = len([word for word in normalized.split() if word])
-        if alpha_chars < 5:
-            return False
-        if word_count <= 1 and alpha_chars <= 6:
-            return False
-        return True
 
     def _build_confirmed_reply(self, language: str, order_row: dict[str, Any]) -> str:
         order_ref = str(order_row.get("external_order_id") or order_row.get("id"))

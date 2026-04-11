@@ -122,8 +122,18 @@ class FakeLLMProvider:
 
 
 class FakeBusinessRepository:
+    def __init__(self, default_language: str | None = "french") -> None:
+        self.default_language = default_language
+
     async def get_by_id(self, business_id: int):
-        return {"id": business_id, "name": "Atlas Gadget Hub"}
+        profile_metadata = {}
+        if self.default_language is not None:
+            profile_metadata["default_language"] = self.default_language
+        return {
+            "id": business_id,
+            "name": "Atlas Gadget Hub",
+            "profile_metadata": profile_metadata,
+        }
 
 
 class FakeIntegrationRepository:
@@ -317,14 +327,17 @@ class FakeOrderConfirmationRepository:
         return [self.session]
 
 
-def _build_service() -> tuple[OrderConfirmationService, FakeChatRepository, FakeOrderRepository, FakeOrderConfirmationRepository]:
+def _build_service(
+    *,
+    business_default_language: str | None = "french",
+) -> tuple[OrderConfirmationService, FakeChatRepository, FakeOrderRepository, FakeOrderConfirmationRepository]:
     session = type("DummyRepoSession", (), {"db": None})()
     service = OrderConfirmationService(
         session=session,
         messaging_provider=FakeProvider(),
         llm_provider=FakeLLMProvider(),
     )
-    service.business_repository = FakeBusinessRepository()
+    service.business_repository = FakeBusinessRepository(business_default_language)
     service.integration_repository = FakeIntegrationRepository()
     chat_repository = FakeChatRepository()
     service.chat_repository = chat_repository
@@ -383,6 +396,36 @@ def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     assert result["confirmation_message_sent"] is True
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
     assert confirmation_repository.session["status"] == "awaiting_customer"
+    assert confirmation_repository.session["preferred_language"] == "french"
+    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "french"
+
+
+def test_ingest_store_order_falls_back_to_darija_when_business_default_language_missing() -> None:
+    service, _, _, confirmation_repository = _build_service(business_default_language=None)
+
+    import asyncio
+
+    result = asyncio.run(
+        service.ingest_store_order(
+            2,
+            StoreOrderIngestRequest(
+                source_store="generic",
+                external_order_id="WC-1003",
+                customer_name="Lina",
+                customer_phone="+212600000001",
+                preferred_language="french",
+                total_amount=3499,
+                currency="MAD",
+                delivery_city="Casablanca",
+                delivery_address="Maarif",
+                items=[{"product_name": "Redmi Note 13", "quantity": 1}],
+            ),
+        )
+    )
+
+    assert result["confirmation_message_sent"] is True
+    assert confirmation_repository.session["preferred_language"] == "darija"
+    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "darija"
 
 
 def test_template_send_stores_rendered_template_preview_in_chat() -> None:
@@ -518,7 +561,7 @@ def test_handle_inbound_confirm_marks_session_confirmed() -> None:
     assert order_repository.row["confirmation_status"] == "confirmed"
     assert confirmation_repository.session["preferred_language"] == "french"
     assert chat_repository.analysis_updates == [(55, "autre", False)]
-    assert "est confirmée" in chat_repository.messages[0]["text"]
+    assert "est confirmée" in chat_repository.messages[1]["text"]
     assert service.llm_provider.detect_calls == []
 
 
@@ -583,7 +626,7 @@ def test_apply_action_resend_reopens_session() -> None:
 
     assert detail["status"] == "awaiting_customer"
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
-    assert len(chat_repository.messages) == 1
+    assert len(chat_repository.messages) == 2
 
 
 def test_handle_inbound_custom_edit_reply_uses_ai_interpretation() -> None:
@@ -669,14 +712,12 @@ def test_handle_inbound_custom_edit_reply_uses_ai_interpretation() -> None:
     assert "Hay Hassani" in pending_edits[0]["value"]
     assert confirmation_repository.session["structured_snapshot"]["delivery_address"] == "Hay Hassani, Casablanca"
     assert confirmation_repository.session["structured_snapshot"]["awaiting_final_confirmation_after_edits"] is True
-    assert "Résumé mis à jour de la commande" in chat_repository.messages[0]["text"]
-    assert "Répondez 1 pour confirmer la commande mise à jour" in chat_repository.messages[0]["text"]
+    assert "Résumé mis à jour de la commande" in chat_repository.messages[1]["text"]
+    assert "Répondez 1 pour confirmer la commande mise à jour" in chat_repository.messages[1]["text"]
     assert chat_repository.analysis_updates == [(55, "autre", False)]
     assert confirmation_repository.events[-1]["payload"]["automation_outcome"] == "awaiting_final_confirmation"
     assert confirmation_repository.events[-1]["payload"]["applied_to_snapshot"] is True
-    assert service.llm_provider.detect_calls == [
-        "Oui je confirme mais changez mon adresse à Hay Hassani"
-    ]
+    assert service.llm_provider.detect_calls == []
 
 
 def test_handle_inbound_delivery_question_answers_without_handoff() -> None:
@@ -752,7 +793,7 @@ def test_handle_inbound_delivery_question_answers_without_handoff() -> None:
     assert confirmation_repository.session["status"] == "awaiting_customer"
     assert order_repository.row["confirmation_status"] == "awaiting_customer"
     assert chat_repository.analysis_updates == [(56, "autre", False)]
-    assert "📍 Détails de livraison" in chat_repository.messages[0]["text"]
+    assert "📍 Détails de livraison" in chat_repository.messages[1]["text"]
 
 
 def test_handle_inbound_quantity_edit_stays_automated_until_final_confirmation() -> None:
@@ -825,8 +866,8 @@ def test_handle_inbound_quantity_edit_stays_automated_until_final_confirmation()
     assert confirmation_repository.session["status"] == "awaiting_customer"
     assert confirmation_repository.session["structured_snapshot"]["items"][0]["quantity"] == 3
     assert confirmation_repository.session["structured_snapshot"]["awaiting_final_confirmation_after_edits"] is True
-    assert "Updated order summary" in chat_repository.messages[0]["text"]
-    assert "Reply 1 to confirm the updated order" in chat_repository.messages[0]["text"]
+    assert "Updated order summary" in chat_repository.messages[1]["text"]
+    assert "Reply 1 to confirm the updated order" in chat_repository.messages[1]["text"]
 
 
 def test_final_confirmation_after_edits_marks_order_confirmed() -> None:
@@ -977,11 +1018,11 @@ def test_numeric_edit_option_keeps_initial_session_language() -> None:
     assert handled is True
     assert confirmation_repository.session["status"] == "edit_requested"
     assert confirmation_repository.session["preferred_language"] == "french"
-    assert "Répondez avec les éléments à modifier" in chat_repository.messages[0]["text"]
+    assert "Répondez avec les éléments à modifier" in chat_repository.messages[1]["text"]
     assert service.llm_provider.detect_calls == []
 
 
-def test_custom_text_updates_session_language_for_following_replies() -> None:
+def test_custom_text_keeps_business_default_language_for_following_replies() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
     confirmation_repository.session = {
         "id": 21,
@@ -1049,9 +1090,9 @@ def test_custom_text_updates_session_language_for_following_replies() -> None:
     )
 
     assert first_handled is True
-    assert confirmation_repository.session["preferred_language"] == "english"
-    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "english"
-    assert "Updated order summary" in chat_repository.messages[0]["text"]
+    assert confirmation_repository.session["preferred_language"] == "french"
+    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "french"
+    assert "Résumé mis à jour de la commande" in chat_repository.messages[1]["text"]
 
     _seed_inbound(chat_repository, 2, "+212600000001", "1")
 
@@ -1073,12 +1114,12 @@ def test_custom_text_updates_session_language_for_following_replies() -> None:
 
     assert second_handled is True
     assert confirmation_repository.session["status"] == "confirmed"
-    assert confirmation_repository.session["preferred_language"] == "english"
-    assert "is confirmed" in chat_repository.messages[-1]["text"]
-    assert service.llm_provider.detect_calls == ["Quantity: 3"]
+    assert confirmation_repository.session["preferred_language"] == "french"
+    assert "est confirmée" in chat_repository.messages[-1]["text"]
+    assert service.llm_provider.detect_calls == []
 
 
-def test_custom_french_text_replaces_darija_session_language() -> None:
+def test_custom_text_does_not_replace_darija_business_default_language() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
     confirmation_repository.session = {
         "id": 21,
@@ -1149,9 +1190,40 @@ def test_custom_french_text_replaces_darija_session_language() -> None:
     )
 
     assert handled is True
-    assert confirmation_repository.session["preferred_language"] == "french"
-    assert "Résumé mis à jour de la commande" in chat_repository.messages[0]["text"]
-    assert service.llm_provider.detect_calls == ["Bonjour, je veux changer mon adresse"]
+    assert confirmation_repository.session["preferred_language"] == "darija"
+    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "darija"
+    assert "Hadchi howa l update dyal commande" in chat_repository.messages[1]["text"]
+    assert service.llm_provider.detect_calls == []
+
+
+def test_business_default_english_maps_order_confirmation_language_to_darija() -> None:
+    service, _, _, confirmation_repository = _build_service(
+        business_default_language="english"
+    )
+
+    import asyncio
+
+    result = asyncio.run(
+        service.ingest_store_order(
+            2,
+            StoreOrderIngestRequest(
+                source_store="generic",
+                external_order_id="WC-1004",
+                customer_name="Lina",
+                customer_phone="+212600000001",
+                preferred_language="english",
+                total_amount=3499,
+                currency="MAD",
+                delivery_city="Casablanca",
+                delivery_address="Maarif",
+                items=[{"product_name": "Redmi Note 13", "quantity": 1}],
+            ),
+        )
+    )
+
+    assert result["confirmation_message_sent"] is True
+    assert confirmation_repository.session["preferred_language"] == "darija"
+    assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "darija"
 
 
 def test_language_detection_failure_keeps_existing_session_language() -> None:
@@ -1232,7 +1304,7 @@ def test_language_detection_failure_keeps_existing_session_language() -> None:
 
     assert handled is True
     assert confirmation_repository.session["preferred_language"] == "french"
-    assert "Détails de livraison" in chat_repository.messages[0]["text"]
+    assert "Détails de livraison" in chat_repository.messages[1]["text"]
 
 
 def test_admin_confirm_applies_final_snapshot_to_order() -> None:

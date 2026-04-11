@@ -32,6 +32,7 @@ class BusinessResponse(BaseModel):
 
 ToneOfVoice = Literal["formal", "friendly", "professional"]
 PaymentMethod = Literal["cash_on_delivery", "card_payment", "bank_transfer"]
+DefaultLanguage = Literal["arabic", "french"]
 
 
 class BusinessFAQItem(BaseModel):
@@ -52,6 +53,7 @@ class BusinessProfile(BaseModel):
     summary: str
     niche: str
     city: str
+    default_language: DefaultLanguage = "darija"
     supported_languages: list[str] = Field(default_factory=list)
     tone_of_voice: ToneOfVoice
     opening_hours: list[str] = Field(default_factory=list)
@@ -82,6 +84,7 @@ class BusinessProfileUpdateRequest(BaseModel):
     summary: str | None = None
     niche: str | None = None
     city: str | None = None
+    default_language: DefaultLanguage | None = None
     supported_languages: list[str] | None = None
     tone_of_voice: ToneOfVoice | None = None
     opening_hours: list[str] | None = None

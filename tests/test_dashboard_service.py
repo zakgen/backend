@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import UTC, datetime
 
 from app.schemas.business import BusinessProfile
+from app.schemas.business import BusinessProfileUpdateRequest
 from app.services.dashboard_service import (
     build_conversation_summaries,
     build_setup_checklist,
     business_row_to_profile,
     derive_sync_status,
+    merge_business_update,
     product_row_to_dashboard,
 )
 
@@ -164,3 +166,42 @@ def test_business_row_to_profile_maps_extended_support_fields() -> None:
     assert profile.support_email == "support@atlasgadgethub.ma"
     assert profile.return_window_days == 7
     assert profile.return_conditions == ["Unused product", "Original packaging"]
+    assert profile.default_language == "arabic"
+
+
+def test_business_row_to_profile_maps_default_language_from_metadata() -> None:
+    profile = business_row_to_profile(
+        {
+            "id": 6,
+            "name": "Boutique Lina",
+            "description": "Fashion store",
+            "city": "Rabat",
+            "shipping_policy": "Delivery available",
+            "delivery_zones": ["Rabat"],
+            "payment_methods": ["cash_on_delivery"],
+            "profile_metadata": {
+                "default_language": "french",
+            },
+            "updated_at": datetime(2026, 3, 29, 13, 0, tzinfo=UTC),
+        },
+        [],
+    )
+
+    assert profile.default_language == "french"
+
+
+def test_merge_business_update_maps_frontend_arabic_to_internal_darija() -> None:
+    payload = merge_business_update(
+        {
+            "name": "Boutique Lina",
+            "description": "Fashion store",
+            "city": "Rabat",
+            "shipping_policy": "Delivery available",
+            "delivery_zones": ["Rabat"],
+            "payment_methods": ["cash_on_delivery"],
+            "profile_metadata": {},
+        },
+        BusinessProfileUpdateRequest(default_language="arabic"),
+    )
+
+    assert payload["profile_metadata"]["default_language"] == "darija"

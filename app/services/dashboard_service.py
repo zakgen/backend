@@ -13,6 +13,7 @@ from app.schemas.business import (
     SetupChecklist,
     SetupChecklistItem,
 )
+from app.services.ai_helpers import normalize_language_label
 from app.schemas.conversation import ConversationMessage, ConversationSummary, ConversationThread
 from app.schemas.integration import (
     CommerceIntegration,
@@ -45,6 +46,18 @@ COMING_SOON = [
         description="Shared inbox and reply suggestions for Instagram messages.",
     ),
 ]
+
+
+def _normalize_business_default_language(value: Any) -> str:
+    normalized = normalize_language_label(value, "darija")
+    return "french" if normalized == "french" else "arabic"
+
+
+def _to_internal_order_confirmation_language(value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized == "french":
+        return "french"
+    return "darija"
 
 
 def to_iso(value: Any) -> str | None:
@@ -150,6 +163,7 @@ def business_row_to_profile(
     tone = metadata.get("tone_of_voice")
     if tone not in VALID_TONES:
         tone = "friendly"
+    default_language = _normalize_business_default_language(metadata.get("default_language"))
 
     return BusinessProfile(
         id=int(business_row["id"]),
@@ -157,6 +171,7 @@ def business_row_to_profile(
         summary=business_row.get("description") or metadata.get("summary") or "",
         niche=str(metadata.get("niche") or ""),
         city=business_row.get("city") or "",
+        default_language=default_language,
         supported_languages=_string_list(metadata.get("supported_languages")),
         tone_of_voice=tone,
         opening_hours=_string_list(metadata.get("opening_hours")),
@@ -190,6 +205,9 @@ def merge_business_update(
 
     field_map = {
         "niche": payload.niche,
+        "default_language": _to_internal_order_confirmation_language(payload.default_language)
+        if payload.default_language is not None
+        else None,
         "supported_languages": payload.supported_languages,
         "tone_of_voice": payload.tone_of_voice,
         "opening_hours": payload.opening_hours,
