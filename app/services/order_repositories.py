@@ -126,6 +126,32 @@ class OrderRepository:
         row = result.mappings().first()
         return dict(row) if row is not None else None
 
+    async def find_by_external_id(
+        self, *, business_id: int, external_order_id: str
+    ) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                """
+                SELECT id, business_id, source_store, external_order_id, customer_name,
+                       customer_phone, preferred_language, total_amount, currency,
+                       payment_method, delivery_city, delivery_address, order_notes,
+                       items, metadata, raw_payload, status, confirmation_status,
+                       created_at, updated_at
+                FROM orders
+                WHERE business_id = :business_id
+                  AND external_order_id = :external_order_id
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "business_id": business_id,
+                "external_order_id": external_order_id,
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row is not None else None
+
     async def update_order_status(
         self,
         *,

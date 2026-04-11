@@ -29,6 +29,7 @@ ACTIVE_SESSION_STATUSES = {
     "edit_requested",
     "human_requested",
 }
+INTEGRATION_SESSION_SOURCES = {"shopify"}
 
 logger = logging.getLogger(__name__)
 ORDER_CONFIRMATION_TEMPLATE_SID_FR = "HXb2abf2118ad2204e79bb7e98bf606b8c"
@@ -56,6 +57,27 @@ class OrderConfirmationService:
     async def ingest_store_order(
         self, business_id: int, payload: StoreOrderIngestRequest
     ) -> dict[str, Any]:
+        if payload.source_store not in INTEGRATION_SESSION_SOURCES:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Order confirmation sessions can only be created from connected store integrations.",
+            )
+        existing_order = await self.order_repository.get_by_external_reference(
+            business_id=business_id,
+            source_store=payload.source_store,
+            external_order_id=payload.external_order_id,
+        )
+        if existing_order is not None:
+            existing_session = await self.order_confirmation_repository.find_latest_by_order(
+                business_id,
+                int(existing_order["id"]),
+            )
+            if existing_session is not None and existing_session["status"] in {"confirmed", "declined"}:
+                return {
+                    "order": existing_order,
+                    "session": existing_session,
+                    "confirmation_message_sent": False,
+                }
         business_row = await self.business_repository.get_by_id(business_id)
         order_row = await self.order_repository.upsert_order(
             business_id=business_id,

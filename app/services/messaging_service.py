@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.schemas.conversation import ConversationReplyRequest
 from app.schemas.integration import WhatsAppConnectRequest
+from app.services.ai_helpers import is_order_management_request, normalize_language_label
 from app.services.ai_reply_service import AIReplyService
 from app.services.dashboard_service import build_whatsapp_integration, chat_row_to_message, to_iso
 from app.services.messaging_provider import AbstractMessagingProvider
@@ -50,6 +51,7 @@ class MessagingService:
         self.business_repository = factory.business()
         self.chat_repository = factory.chats()
         self.integration_repository = factory.integrations()
+        self.order_repository = factory.orders()
         self.order_confirmation_repository = factory.order_confirmations()
 
     async def begin_whatsapp_connection(
@@ -292,14 +294,20 @@ class MessagingService:
                 str(row.get("phone") or ""),
             )
             if latest_session is not None and latest_session.get("status") in TERMINAL_ORDER_SESSION_STATUSES:
-                logger.info(
-                    "AI auto-reply skipped because latest order confirmation session is terminal business_id=%s phone=%s session_id=%s status=%s",
-                    connection["business_id"],
-                    row.get("phone"),
-                    latest_session.get("id"),
-                    latest_session.get("status"),
+                handled_terminal_follow_up = await self._maybe_handle_finalized_order_follow_up(
+                    connection=connection,
+                    inbound_row=row,
+                    latest_session=latest_session,
                 )
-                return row
+                if handled_terminal_follow_up:
+                    logger.info(
+                        "Finalized order follow-up handled in read-only mode business_id=%s phone=%s session_id=%s status=%s",
+                        connection["business_id"],
+                        row.get("phone"),
+                        latest_session.get("id"),
+                        latest_session.get("status"),
+                    )
+                    return row
             ai_service = AIReplyService(
                 session=self.session,
                 messaging_provider=self.provider,
@@ -321,6 +329,270 @@ class MessagingService:
                 needs_human=True,
             )
         return row
+
+    async def _maybe_handle_finalized_order_follow_up(
+        self,
+        *,
+        connection: dict[str, Any],
+        inbound_row: dict[str, Any],
+        latest_session: dict[str, Any],
+    ) -> bool:
+        business_id = int(connection["business_id"])
+        customer_text = str(inbound_row.get("text") or "")
+        resolved_order = await self.order_repository.get_by_id(
+            business_id,
+            int(latest_session["order_id"]),
+        )
+        resolved_session = latest_session
+
+        for candidate in self._extract_order_reference_candidates(customer_text):
+            candidate_order = await self.order_repository.find_by_external_id(
+                business_id=business_id,
+                external_order_id=candidate,
+            )
+            if candidate_order is None:
+                continue
+            candidate_session = await self.order_confirmation_repository.find_latest_by_order(
+                business_id,
+                int(candidate_order["id"]),
+            )
+            if candidate_session is None or candidate_session.get("status") not in TERMINAL_ORDER_SESSION_STATUSES:
+                continue
+            resolved_order = candidate_order
+            resolved_session = candidate_session
+            break
+
+        if not self._is_finalized_order_follow_up(
+            message=customer_text,
+            latest_order=resolved_order,
+        ):
+            return False
+
+        business_row = await self.business_repository.get_by_id(business_id)
+        language = normalize_language_label(
+            resolved_session.get("preferred_language") or resolved_order.get("preferred_language"),
+            "darija",
+        )
+        reply_text = self._build_finalized_order_reply(
+            language=language,
+            order_row=resolved_order,
+            session_row=resolved_session,
+            customer_text=customer_text,
+            business_row=business_row,
+        )
+        await self._send_connection_reply(
+            connection=connection,
+            phone=str(inbound_row.get("phone") or ""),
+            text=reply_text,
+        )
+        return True
+
+    async def _send_connection_reply(
+        self,
+        *,
+        connection: dict[str, Any],
+        phone: str,
+        text: str,
+    ) -> dict[str, Any]:
+        config = dict(connection.get("config") or {})
+        result = await self.provider.send_text(
+            SendMessageCommand(
+                business_id=int(connection["business_id"]),
+                phone=phone,
+                text=text,
+                config=config,
+                subaccount_sid=str(config["subaccount_sid"]),
+            )
+        )
+        row = await self.chat_repository.upsert_message(
+            business_id=int(connection["business_id"]),
+            phone=result.to_phone,
+            customer_name=None,
+            text=text,
+            direction="outbound",
+            intent="autre",
+            needs_human=True,
+            is_read=True,
+            provider=result.provider,
+            provider_message_sid=result.provider_message_sid,
+            provider_status=result.provider_status,
+            error_code=result.error_code,
+            raw_payload=result.raw_payload,
+        )
+        await self.integration_repository.increment_whatsapp_metrics(
+            int(connection["business_id"]),
+            sent_delta=1,
+            failed_delta=1 if result.error_code else 0,
+            touch_last_activity=True,
+        )
+        return row
+
+    def _extract_order_reference_candidates(self, message: str) -> list[str]:
+        candidates: list[str] = []
+        token = []
+        for char in message:
+            if char.isalnum() or char in {"-", "_", "#"}:
+                token.append(char)
+                continue
+            if token:
+                candidates.append("".join(token))
+                token = []
+        if token:
+            candidates.append("".join(token))
+        normalized: list[str] = []
+        for candidate in candidates:
+            stripped = candidate.strip().lstrip("#").rstrip(".,!?;:")
+            if len(stripped) < 4 or not any(ch.isdigit() for ch in stripped):
+                continue
+            if stripped not in normalized:
+                normalized.append(stripped)
+        return normalized
+
+    def _is_finalized_order_follow_up(self, *, message: str, latest_order: dict[str, Any]) -> bool:
+        normalized = message.strip().lower()
+        if not normalized:
+            return False
+        if is_order_management_request(normalized):
+            return True
+        if any(
+            token in normalized
+            for token in (
+                "change",
+                "edit",
+                "modify",
+                "address",
+                "adresse",
+                "city",
+                "ville",
+                "quantity",
+                "variant",
+                "color",
+                "cancel",
+                "annuler",
+                "confirm",
+                "status",
+                "where is",
+                "delivery",
+                "بدل",
+                "تعديل",
+                "العنوان",
+                "المدينة",
+                "الكمية",
+                "اللون",
+                "إلغاء",
+                "تأكيد",
+                "الطلب",
+            )
+        ):
+            return True
+        external_order_id = str(latest_order.get("external_order_id") or "").strip().lower()
+        return bool(external_order_id and external_order_id in normalized)
+
+    def _build_finalized_order_reply(
+        self,
+        *,
+        language: str,
+        order_row: dict[str, Any],
+        session_row: dict[str, Any],
+        customer_text: str,
+        business_row: dict[str, Any],
+    ) -> str:
+        external_order_id = str(order_row.get("external_order_id") or order_row.get("id"))
+        session_status = str(session_row.get("status") or "")
+        final_label = {
+            "confirmed": {
+                "english": "confirmed",
+                "french": "confirmée",
+                "darija": "متأكد",
+            },
+            "declined": {
+                "english": "cancelled",
+                "french": "annulée",
+                "darija": "ملغي",
+            },
+        }["declined" if session_status == "declined" else "confirmed"][language]
+        mutation_requested = self._looks_like_finalized_order_mutation(customer_text)
+        support_line = self._build_support_contact_line(language, business_row)
+        if language == "french":
+            locked_line = (
+                "Cette commande ne peut plus être modifiée dans ce chat."
+                if mutation_requested
+                else "Cette commande est déjà finalisée."
+            )
+            return (
+                f"📦 La commande *#{external_order_id}* est déjà {final_label}.\n\n"
+                f"{locked_line}\n\n"
+                f"{support_line}"
+            )
+        if language == "darija":
+            locked_line = (
+                "هاد الطلب ما بقىش ممكن تبدلو من هاد الشات."
+                if mutation_requested
+                else "هاد الطلب راه تسالى وتأكد بالفعل."
+                if session_status == "confirmed"
+                else "هاد الطلب راه تلغى بالفعل."
+            )
+            return (
+                f"📦 الطلب *#{external_order_id}* راه {final_label} بالفعل.\n\n"
+                f"{locked_line}\n\n"
+                f"{support_line}"
+            )
+        locked_line = (
+            "This order can no longer be changed in this chat."
+            if mutation_requested
+            else "This order is already finalized."
+        )
+        return (
+            f"📦 Order *#{external_order_id}* is already {final_label}.\n\n"
+            f"{locked_line}\n\n"
+            f"{support_line}"
+        )
+
+    def _looks_like_finalized_order_mutation(self, message: str) -> bool:
+        normalized = message.strip().lower()
+        return any(
+            token in normalized
+            for token in (
+                "change",
+                "edit",
+                "modify",
+                "cancel",
+                "confirm",
+                "address",
+                "adresse",
+                "city",
+                "ville",
+                "quantity",
+                "variant",
+                "color",
+                "بدل",
+                "تعديل",
+                "إلغاء",
+                "تأكيد",
+                "العنوان",
+                "المدينة",
+                "الكمية",
+                "اللون",
+            )
+        )
+
+    def _build_support_contact_line(self, language: str, business_row: dict[str, Any]) -> str:
+        whatsapp = str(business_row.get("whatsapp_number") or "").strip()
+        phone = str(business_row.get("support_phone") or "").strip()
+        email = str(business_row.get("support_email") or "").strip()
+        parts = []
+        if whatsapp:
+            parts.append(f"WhatsApp: {whatsapp}")
+        if phone:
+            parts.append(f"Phone: {phone}")
+        if email:
+            parts.append(f"Email: {email}")
+        details = "; ".join(parts)
+        if language == "french":
+            return f"Merci de contacter le support. {details}".strip()
+        if language == "darija":
+            return f"من فضلك تواصل مع الدعم. {details}".strip()
+        return f"Please contact support. {details}".strip()
 
     async def handle_status_webhook(
         self, *, url: str, headers: Mapping[str, str], params: Mapping[str, Any]

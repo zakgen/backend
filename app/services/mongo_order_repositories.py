@@ -139,6 +139,18 @@ class MongoOrderRepository:
             )
         )
 
+    async def find_by_external_id(
+        self, *, business_id: int, external_order_id: str
+    ) -> dict[str, Any] | None:
+        row = await self.db.orders.find_one(
+            {
+                "business_id": business_id,
+                "external_order_id": external_order_id,
+            },
+            sort=[("updated_at", -1), ("id", -1)],
+        )
+        return _copy_doc(row)
+
     async def update_order_status(
         self,
         *,

@@ -213,6 +213,16 @@ class FakeOrderRepository:
     def __init__(self) -> None:
         self.row = None
 
+    async def get_by_external_reference(self, *, business_id: int, source_store: str, external_order_id: str):
+        if (
+            self.row is not None
+            and self.row.get("business_id") == business_id
+            and self.row.get("source_store") == source_store
+            and self.row.get("external_order_id") == external_order_id
+        ):
+            return self.row
+        return None
+
     async def upsert_order(self, *, business_id: int, payload: dict):
         self.row = {
             "id": 10,
@@ -422,7 +432,7 @@ def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
         service.ingest_store_order(
             2,
             StoreOrderIngestRequest(
-                source_store="generic",
+                source_store="shopify",
                 external_order_id="WC-1001",
                 customer_name="Lina",
                 customer_phone="+212600000001",
@@ -452,7 +462,7 @@ def test_ingest_store_order_falls_back_to_darija_when_business_default_language_
         service.ingest_store_order(
             2,
             StoreOrderIngestRequest(
-                source_store="generic",
+                source_store="shopify",
                 external_order_id="WC-1003",
                 customer_name="Lina",
                 customer_phone="+212600000001",
@@ -517,7 +527,7 @@ def test_ingest_store_order_skips_duplicate_send_when_claim_fails() -> None:
         service.ingest_store_order(
             2,
             StoreOrderIngestRequest(
-                source_store="generic",
+                source_store="shopify",
                 external_order_id="WC-1002",
                 customer_name="Lina",
                 customer_phone="+212600000001",
@@ -1405,7 +1415,7 @@ def test_business_default_english_maps_order_confirmation_language_to_darija() -
         service.ingest_store_order(
             2,
             StoreOrderIngestRequest(
-                source_store="generic",
+                source_store="shopify",
                 external_order_id="WC-1004",
                 customer_name="Lina",
                 customer_phone="+212600000001",
@@ -1422,6 +1432,104 @@ def test_business_default_english_maps_order_confirmation_language_to_darija() -
     assert result["confirmation_message_sent"] is True
     assert confirmation_repository.session["preferred_language"] == "darija"
     assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "darija"
+
+
+def test_ingest_store_order_does_not_reopen_terminal_shopify_session() -> None:
+    service, chat_repository, order_repository, confirmation_repository = _build_service()
+    order_repository.row = {
+        "id": 10,
+        "business_id": 2,
+        "source_store": "shopify",
+        "external_order_id": "WC-1006",
+        "customer_name": "Lina",
+        "customer_phone": "+212600000001",
+        "preferred_language": "french",
+        "total_amount": 3499,
+        "currency": "MAD",
+        "payment_method": "cash_on_delivery",
+        "delivery_city": "Casablanca",
+        "delivery_address": "Maarif",
+        "order_notes": None,
+        "items": [{"product_name": "Redmi Note 13", "quantity": 1}],
+        "metadata": {},
+        "raw_payload": {},
+        "status": "confirmed",
+        "confirmation_status": "confirmed",
+        "created_at": datetime.now(UTC),
+        "updated_at": datetime.now(UTC),
+    }
+    confirmation_repository.session = {
+        "id": 21,
+        "business_id": 2,
+        "order_id": 10,
+        "phone": "+212600000001",
+        "customer_name": "Lina",
+        "preferred_language": "french",
+        "status": "confirmed",
+        "needs_human": False,
+        "last_detected_intent": "customer_confirmed",
+        "started_at": datetime.now(UTC),
+        "last_customer_message_at": None,
+        "confirmed_at": datetime.now(UTC),
+        "declined_at": None,
+        "updated_at": datetime.now(UTC),
+        "structured_snapshot": {"preferred_language": "french"},
+    }
+
+    import asyncio
+
+    result = asyncio.run(
+        service.ingest_store_order(
+            2,
+            StoreOrderIngestRequest(
+                source_store="shopify",
+                external_order_id="WC-1006",
+                customer_name="Lina Updated",
+                customer_phone="+212600000001",
+                preferred_language="english",
+                total_amount=9999,
+                currency="MAD",
+                delivery_city="Rabat",
+                delivery_address="Agdal",
+                items=[{"product_name": "Changed Product", "quantity": 2}],
+            ),
+        )
+    )
+
+    assert result["confirmation_message_sent"] is False
+    assert result["session"]["status"] == "confirmed"
+    assert order_repository.row["customer_name"] == "Lina"
+    assert not chat_repository.messages
+
+
+def test_ingest_store_order_rejects_non_integration_sources() -> None:
+    service, _, _, _ = _build_service()
+
+    import asyncio
+    from fastapi import HTTPException
+
+    try:
+        asyncio.run(
+            service.ingest_store_order(
+                2,
+                StoreOrderIngestRequest(
+                    source_store="generic",
+                    external_order_id="WC-1005",
+                    customer_name="Lina",
+                    customer_phone="+212600000001",
+                    preferred_language="french",
+                    total_amount=3499,
+                    currency="MAD",
+                    delivery_city="Casablanca",
+                    delivery_address="Maarif",
+                    items=[{"product_name": "Redmi Note 13", "quantity": 1}],
+                ),
+            )
+        )
+    except HTTPException as exc:
+        assert exc.status_code == 409
+    else:
+        raise AssertionError("Expected HTTPException for non-integration source")
 
 
 def test_language_detection_failure_keeps_existing_session_language() -> None:
