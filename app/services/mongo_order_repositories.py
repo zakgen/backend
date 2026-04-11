@@ -289,6 +289,18 @@ class MongoOrderConfirmationRepository:
         rows.sort(key=lambda row: (row.get("updated_at"), row.get("id", 0)), reverse=True)
         return _copy_doc(rows[0])
 
+    async def find_latest_by_phone(self, business_id: int, phone: str) -> dict[str, Any] | None:
+        rows = await self.db.order_confirmation_sessions.find(
+            {
+                "business_id": business_id,
+                "phone": normalize_phone_number(phone),
+            }
+        ).to_list(length=None)
+        if not rows:
+            return None
+        rows.sort(key=lambda row: (row.get("updated_at"), row.get("id", 0)), reverse=True)
+        return _copy_doc(rows[0])
+
     async def update_session(self, session_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         existing = await self.db.order_confirmation_sessions.find_one({"id": session_id})
         if existing is None:

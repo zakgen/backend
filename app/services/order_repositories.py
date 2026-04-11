@@ -336,6 +336,26 @@ class OrderConfirmationRepository:
         row = result.mappings().first()
         return dict(row) if row is not None else None
 
+    async def find_latest_by_phone(self, business_id: int, phone: str) -> dict[str, Any] | None:
+        result = await self.session.execute(
+            text(
+                f"""
+                SELECT {self._SESSION_COLUMNS}
+                FROM order_confirmation_sessions
+                WHERE business_id = :business_id
+                  AND phone = :phone
+                ORDER BY updated_at DESC, id DESC
+                LIMIT 1
+                """
+            ),
+            {
+                "business_id": business_id,
+                "phone": normalize_phone_number(phone),
+            },
+        )
+        row = result.mappings().first()
+        return dict(row) if row is not None else None
+
     async def update_session(self, session_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         if not payload:
             raise ValueError("update_session requires at least one field.")

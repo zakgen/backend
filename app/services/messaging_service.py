@@ -19,6 +19,7 @@ from app.services.repository_factory import RepositoryFactory
 
 
 logger = logging.getLogger(__name__)
+TERMINAL_ORDER_SESSION_STATUSES = {"declined", "confirmed"}
 
 
 def _connection_state_from_row(
@@ -49,6 +50,7 @@ class MessagingService:
         self.business_repository = factory.business()
         self.chat_repository = factory.chats()
         self.integration_repository = factory.integrations()
+        self.order_confirmation_repository = factory.order_confirmations()
 
     async def begin_whatsapp_connection(
         self, business_id: int, payload: WhatsAppConnectRequest
@@ -284,6 +286,19 @@ class MessagingService:
                 inbound_row=row,
             )
             if handled:
+                return row
+            latest_session = await self.order_confirmation_repository.find_latest_by_phone(
+                int(connection["business_id"]),
+                str(row.get("phone") or ""),
+            )
+            if latest_session is not None and latest_session.get("status") in TERMINAL_ORDER_SESSION_STATUSES:
+                logger.info(
+                    "AI auto-reply skipped because latest order confirmation session is terminal business_id=%s phone=%s session_id=%s status=%s",
+                    connection["business_id"],
+                    row.get("phone"),
+                    latest_session.get("id"),
+                    latest_session.get("status"),
+                )
                 return row
             ai_service = AIReplyService(
                 session=self.session,
