@@ -385,6 +385,42 @@ def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     assert confirmation_repository.session["status"] == "awaiting_customer"
 
 
+def test_template_send_stores_rendered_template_preview_in_chat() -> None:
+    service, chat_repository, _, _ = _build_service()
+
+    import asyncio
+
+    row = asyncio.run(
+        service._send_text(
+            business_id=2,
+            phone="+212600000001",
+            text="fallback",
+            connection={
+                "config": {
+                    "provider": "twilio",
+                    "onboarding_status": "connected",
+                    "subaccount_sid": "AC123",
+                    "sender_sid": "PN123",
+                    "whatsapp_number": "+14155238886",
+                }
+            },
+            content_sid="HX0d04a9dd60c8885d847d7f6d5ee7a1b9",
+            content_variables={
+                "1": "Zakaria Imz",
+                "2": "Mercedes Benz Mansoury",
+                "3": "Selling Plans Ski Wax x1",
+                "4": "Sala Al Jadida, Mly Youssef",
+                "5": "Sala Al Jadida",
+                "6": "9.95 USD",
+            },
+        )
+    )
+
+    assert row["text"].startswith("السلام عليكم Zakaria Imz")
+    assert "🏠 العنوان: Sala Al Jadida, Mly Youssef" in row["text"]
+    assert row["raw_payload"]["content_sid"] == "HX0d04a9dd60c8885d847d7f6d5ee7a1b9"
+
+
 def test_ingest_store_order_skips_duplicate_send_when_claim_fails() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
     confirmation_repository.claim_result = False

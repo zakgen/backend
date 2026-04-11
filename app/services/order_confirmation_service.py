@@ -825,6 +825,14 @@ class OrderConfirmationService:
         content_variables: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         config = dict(connection.get("config") or {})
+        display_text = text
+        if content_sid is not None:
+            rendered_preview = self._render_template_preview(
+                content_sid=content_sid,
+                content_variables=content_variables or {},
+            )
+            if rendered_preview:
+                display_text = rendered_preview
         if content_sid is None and not await self._is_free_text_allowed(business_id, phone):
             logger.info(
                 "Order confirmation reply skipped outside 24h window business_id=%s phone=%s",
@@ -835,7 +843,7 @@ class OrderConfirmationService:
                 business_id=business_id,
                 phone=phone,
                 customer_name=None,
-                text=text,
+                text=display_text,
                 direction="outbound",
                 intent="autre",
                 needs_human=False,
@@ -861,7 +869,7 @@ class OrderConfirmationService:
             business_id=business_id,
             phone=result.to_phone,
             customer_name=None,
-            text=text,
+            text=display_text,
             direction="outbound",
             intent="autre",
             needs_human=False,
@@ -870,7 +878,15 @@ class OrderConfirmationService:
             provider_message_sid=result.provider_message_sid,
             provider_status=result.provider_status,
             error_code=result.error_code,
-            raw_payload=result.raw_payload,
+            raw_payload=result.raw_payload
+            | (
+                {
+                    "content_sid": content_sid,
+                    "content_variables": content_variables,
+                }
+                if content_sid
+                else {}
+            ),
         )
         await self.integration_repository.increment_whatsapp_metrics(
             business_id,
@@ -879,6 +895,60 @@ class OrderConfirmationService:
             touch_last_activity=True,
         )
         return row
+
+    def _render_template_preview(
+        self,
+        *,
+        content_sid: str,
+        content_variables: dict[str, Any],
+    ) -> str:
+        if content_sid == ORDER_CONFIRMATION_TEMPLATE_SID_FR:
+            return self._render_french_confirmation_template(content_variables)
+        if content_sid == ORDER_CONFIRMATION_TEMPLATE_SID_AR:
+            return self._render_arabic_confirmation_template(content_variables)
+        return ""
+
+    def _render_french_confirmation_template(
+        self,
+        content_variables: dict[str, Any],
+    ) -> str:
+        customer_name = str(content_variables.get("1") or "Client")
+        business_name = str(content_variables.get("2") or "ZakBot")
+        items_summary = str(content_variables.get("3") or "-")
+        delivery_address = str(content_variables.get("4") or "-")
+        delivery_city = str(content_variables.get("5") or "-")
+        total_amount = str(content_variables.get("6") or "-")
+        return (
+            f"Bonjour {customer_name},\n\n"
+            f"😊 Merci pour votre commande chez {business_name}\n\n"
+            "Voici les details de votre commande :\n"
+            f"{items_summary}\n\n"
+            f"🏠 Adresse : {delivery_address}\n"
+            f"🏙️ Ville : {delivery_city}\n\n"
+            f"💰 Montant total : {total_amount}\n\n"
+            "Merci de confirmer votre commande afin que nous puissions la traiter."
+        )
+
+    def _render_arabic_confirmation_template(
+        self,
+        content_variables: dict[str, Any],
+    ) -> str:
+        customer_name = str(content_variables.get("1") or "العميل")
+        business_name = str(content_variables.get("2") or "ZakBot")
+        items_summary = str(content_variables.get("3") or "-")
+        delivery_address = str(content_variables.get("4") or "-")
+        delivery_city = str(content_variables.get("5") or "-")
+        total_amount = str(content_variables.get("6") or "-")
+        return (
+            f"السلام عليكم {customer_name}\n\n"
+            f"😊 نشكرك على الطلب ديالك معنا من {business_name}\n\n"
+            "ها التفاصيل ديال الطلب ديالك:\n"
+            f"{items_summary}\n\n"
+            f"🏠 العنوان: {delivery_address}\n\n"
+            f"🏙️ المدينة: {delivery_city}\n\n"
+            f"💰 الثمن الإجمالي: {total_amount}\n\n"
+            "عفاك أكد الطلب ديالك باش نبداو الخدمة"
+        )
 
     async def _is_free_text_allowed(self, business_id: int, phone: str) -> bool:
         rows = await self.chat_repository.list_messages(
