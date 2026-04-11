@@ -173,6 +173,7 @@ async def list_business_chats(
     )
     factory = RepositoryFactory(session)
     await factory.business().get_by_id(business_id)
+    order_confirmation_repository = factory.order_confirmations()
     rows = await factory.chats().list_messages(
         business_id,
         phone=phone,
@@ -180,7 +181,21 @@ async def list_business_chats(
         direction=direction,
         needs_human=needs_human,
     )
-    return build_conversation_summaries(rows)
+    latest_sessions_by_phone: dict[str, dict] = {}
+    for row in rows:
+        row_phone = str(row.get("phone") or "")
+        if not row_phone or row_phone in latest_sessions_by_phone:
+            continue
+        latest_session = await order_confirmation_repository.find_latest_by_phone(
+            business_id,
+            row_phone,
+        )
+        if latest_session is not None:
+            latest_sessions_by_phone[row_phone] = latest_session
+    return build_conversation_summaries(
+        rows,
+        latest_sessions_by_phone=latest_sessions_by_phone,
+    )
 
 
 @router.get(
@@ -207,7 +222,11 @@ async def get_business_chat_thread(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"No conversation found for phone {phone}.",
         )
-    return build_conversation_thread(phone, rows)
+    latest_session = await factory.order_confirmations().find_latest_by_phone(
+        business_id,
+        phone,
+    )
+    return build_conversation_thread(phone, rows, latest_session=latest_session)
 
 
 @router.get(

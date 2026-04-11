@@ -6,6 +6,8 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 ConversationDirection = Literal["inbound", "outbound"]
+ConversationContext = Literal["general", "order_confirmation"]
+OrderWindowStatus = Literal["ongoing", "closed"]
 ConversationIntent = Literal[
     "livraison",
     "prix",
@@ -26,6 +28,11 @@ class ConversationMessage(BaseModel):
     timestamp: str
     intent: ConversationIntent | None = None
     needs_human: bool | None = None
+    message_context: ConversationContext = "general"
+    order_window_status: OrderWindowStatus | None = None
+    order_session_id: str | None = None
+    order_id: str | None = None
+    order_external_id: str | None = None
 
 
 class ConversationSummary(BaseModel):
@@ -38,6 +45,11 @@ class ConversationSummary(BaseModel):
     needs_human: bool
     inbound_count: int
     outbound_count: int
+    message_context: ConversationContext = "general"
+    order_window_status: OrderWindowStatus | None = None
+    order_session_id: str | None = None
+    order_id: str | None = None
+    order_external_id: str | None = None
 
 
 class ConversationThread(BaseModel):

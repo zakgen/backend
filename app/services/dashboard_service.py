@@ -276,7 +276,46 @@ def build_product_storage_payload(
     }
 
 
-def chat_row_to_message(row: dict[str, Any]) -> ConversationMessage:
+def _chat_order_context(row: dict[str, Any], latest_session: dict[str, Any] | None) -> dict[str, Any]:
+    if latest_session is None:
+        return {
+            "message_context": "general",
+            "order_window_status": None,
+            "order_session_id": None,
+            "order_id": None,
+            "order_external_id": None,
+        }
+    message_timestamp = to_iso(row.get("created_at")) or ""
+    session_started_at = to_iso(latest_session.get("started_at")) or ""
+    if session_started_at and message_timestamp and message_timestamp < session_started_at:
+        return {
+            "message_context": "general",
+            "order_window_status": None,
+            "order_session_id": None,
+            "order_id": None,
+            "order_external_id": None,
+        }
+    status = str(latest_session.get("status") or "")
+    return {
+        "message_context": "order_confirmation",
+        "order_window_status": "ongoing"
+        if status in {"pending_send", "awaiting_customer", "edit_requested", "human_requested"}
+        else "closed",
+        "order_session_id": str(latest_session["id"]),
+        "order_id": str(latest_session["order_id"]),
+        "order_external_id": str(
+            dict(latest_session.get("structured_snapshot") or {}).get("external_order_id") or ""
+        )
+        or None,
+    }
+
+
+def chat_row_to_message(
+    row: dict[str, Any],
+    *,
+    latest_session: dict[str, Any] | None = None,
+) -> ConversationMessage:
+    order_context = _chat_order_context(row, latest_session)
     return ConversationMessage(
         id=str(row["id"]),
         phone=row.get("phone") or "",
@@ -285,10 +324,19 @@ def chat_row_to_message(row: dict[str, Any]) -> ConversationMessage:
         timestamp=to_iso(row.get("created_at")) or "",
         intent=row.get("intent"),
         needs_human=bool(row.get("needs_human")) if row.get("needs_human") is not None else False,
+        message_context=order_context["message_context"],
+        order_window_status=order_context["order_window_status"],
+        order_session_id=order_context["order_session_id"],
+        order_id=order_context["order_id"],
+        order_external_id=order_context["order_external_id"],
     )
 
 
-def build_conversation_summaries(rows: list[dict[str, Any]]) -> list[ConversationSummary]:
+def build_conversation_summaries(
+    rows: list[dict[str, Any]],
+    *,
+    latest_sessions_by_phone: dict[str, dict[str, Any]] | None = None,
+) -> list[ConversationSummary]:
     grouped: dict[str, dict[str, Any]] = {}
 
     for row in rows:
@@ -299,6 +347,8 @@ def build_conversation_summaries(rows: list[dict[str, Any]]) -> list[Conversatio
         created_at = to_iso(row.get("created_at")) or ""
         summary = grouped.get(phone)
         if summary is None:
+            latest_session = (latest_sessions_by_phone or {}).get(phone)
+            order_context = _chat_order_context(row, latest_session)
             summary = {
                 "phone": phone,
                 "customer_name": row.get("customer_name"),
@@ -309,6 +359,11 @@ def build_conversation_summaries(rows: list[dict[str, Any]]) -> list[Conversatio
                 "needs_human": False,
                 "inbound_count": 0,
                 "outbound_count": 0,
+                "message_context": order_context["message_context"],
+                "order_window_status": order_context["order_window_status"],
+                "order_session_id": order_context["order_session_id"],
+                "order_id": order_context["order_id"],
+                "order_external_id": order_context["order_external_id"],
             }
             grouped[phone] = summary
 
@@ -336,6 +391,11 @@ def build_conversation_summaries(rows: list[dict[str, Any]]) -> list[Conversatio
             needs_human=item["needs_human"],
             inbound_count=item["inbound_count"],
             outbound_count=item["outbound_count"],
+            message_context=item["message_context"],
+            order_window_status=item["order_window_status"],
+            order_session_id=item["order_session_id"],
+            order_id=item["order_id"],
+            order_external_id=item["order_external_id"],
         )
         for item in grouped.values()
     ]
@@ -343,7 +403,12 @@ def build_conversation_summaries(rows: list[dict[str, Any]]) -> list[Conversatio
     return summaries
 
 
-def build_conversation_thread(phone: str, rows: list[dict[str, Any]]) -> ConversationThread:
+def build_conversation_thread(
+    phone: str,
+    rows: list[dict[str, Any]],
+    *,
+    latest_session: dict[str, Any] | None = None,
+) -> ConversationThread:
     ordered_rows = sorted(rows, key=lambda row: to_iso(row.get("created_at")) or "")
     customer_name = next(
         (row.get("customer_name") for row in ordered_rows if row.get("customer_name")),
@@ -354,7 +419,7 @@ def build_conversation_thread(phone: str, rows: list[dict[str, Any]]) -> Convers
         phone=phone,
         customer_name=customer_name,
         first_contact_at=first_contact_at,
-        messages=[chat_row_to_message(row) for row in ordered_rows],
+        messages=[chat_row_to_message(row, latest_session=latest_session) for row in ordered_rows],
     )
 
 

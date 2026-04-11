@@ -6,6 +6,7 @@ from app.schemas.business import BusinessProfile
 from app.schemas.business import BusinessProfileUpdateRequest
 from app.services.dashboard_service import (
     build_conversation_summaries,
+    build_conversation_thread,
     build_setup_checklist,
     business_row_to_profile,
     derive_sync_status,
@@ -79,6 +80,84 @@ def test_build_conversation_summaries_groups_by_phone() -> None:
     assert summaries[0].outbound_count == 1
     assert summaries[0].unread_count == 1
     assert summaries[0].intents == ["livraison"]
+    assert summaries[0].message_context == "general"
+    assert summaries[0].order_window_status is None
+
+
+def test_build_conversation_summaries_marks_latest_order_confirmation_context() -> None:
+    rows = [
+        {
+            "id": 2,
+            "phone": "+212600000001",
+            "customer_name": "Lina",
+            "text": "1",
+            "direction": "inbound",
+            "intent": "autre",
+            "needs_human": False,
+            "is_read": False,
+            "created_at": datetime(2026, 3, 29, 12, 5, tzinfo=UTC),
+        },
+    ]
+
+    summaries = build_conversation_summaries(
+        rows,
+        latest_sessions_by_phone={
+            "+212600000001": {
+                "id": 21,
+                "order_id": 10,
+                "status": "awaiting_customer",
+                "started_at": datetime(2026, 3, 29, 12, 0, tzinfo=UTC),
+                "structured_snapshot": {"external_order_id": "WC-1001"},
+            }
+        },
+    )
+
+    assert summaries[0].message_context == "order_confirmation"
+    assert summaries[0].order_window_status == "ongoing"
+    assert summaries[0].order_session_id == "21"
+    assert summaries[0].order_id == "10"
+    assert summaries[0].order_external_id == "WC-1001"
+
+
+def test_build_conversation_thread_marks_messages_before_session_start_as_general() -> None:
+    thread = build_conversation_thread(
+        "+212600000001",
+        [
+            {
+                "id": 1,
+                "phone": "+212600000001",
+                "customer_name": "Lina",
+                "text": "hello",
+                "direction": "inbound",
+                "intent": None,
+                "needs_human": False,
+                "created_at": datetime(2026, 3, 29, 11, 0, tzinfo=UTC),
+            },
+            {
+                "id": 2,
+                "phone": "+212600000001",
+                "customer_name": "Lina",
+                "text": "1",
+                "direction": "inbound",
+                "intent": "autre",
+                "needs_human": False,
+                "created_at": datetime(2026, 3, 29, 12, 5, tzinfo=UTC),
+            },
+        ],
+        latest_session={
+            "id": 21,
+            "order_id": 10,
+            "status": "confirmed",
+            "started_at": datetime(2026, 3, 29, 12, 0, tzinfo=UTC),
+            "structured_snapshot": {"external_order_id": "WC-1001"},
+        },
+    )
+
+    assert thread.messages[0].message_context == "general"
+    assert thread.messages[0].order_window_status is None
+    assert thread.messages[1].message_context == "order_confirmation"
+    assert thread.messages[1].order_window_status == "closed"
+    assert thread.messages[1].order_session_id == "21"
 
 
 def test_derive_sync_status_marks_recommended_when_products_need_sync() -> None:
