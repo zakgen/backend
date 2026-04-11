@@ -9,6 +9,7 @@ from app.schemas.ai import AIReplyRequest
 from app.schemas.business import BusinessProfile
 from app.schemas.order_confirmation import OrderSessionInterpretation
 from app.services.ai_reply_service import AIReplyService
+from app.services.ai_prompt_builder import build_ai_reply_prompts
 
 
 class DummyLLMProvider:
@@ -163,3 +164,34 @@ async def test_generate_preview_returns_order_handoff(monkeypatch, business_prof
     assert response.needs_human is True
     assert "support" in (response.reply_text or "").lower()
     assert "whatsapp" in (response.reply_text or "").lower()
+
+
+def test_build_ai_reply_prompts_require_arabic_script_for_darija(
+    business_profile: BusinessProfile,
+) -> None:
+    system_prompt, _ = build_ai_reply_prompts(
+        business_profile=business_profile,
+        customer_message="wach kayn delivery",
+        recent_messages=[],
+        selected_sources=[],
+        language_hint="darija",
+        intent_hint="livraison",
+    )
+
+    assert "Arabic script" in system_prompt
+    assert "Do not use Latin transliteration" in system_prompt
+
+
+def test_rule_based_darija_contact_reply_uses_arabic_script(
+    business_profile: BusinessProfile,
+) -> None:
+    service = _service()
+    reply, _, _, _ = service._build_contact_reply(
+        business_profile,
+        "darija",
+        "فين العنوان؟",
+    )
+
+    assert reply.language == "darija"
+    assert "العنوان ديالنا هو" in (reply.reply_text or "")
+    assert "dyalna" not in (reply.reply_text or "")

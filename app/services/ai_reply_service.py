@@ -696,8 +696,8 @@ class AIReplyService:
                 f"Pour le suivi, les modifications, les annulations ou les réclamations, merci de contacter le support. {contact_line}"
             ),
             "darija": (
-                "Tadبير dyal les commandes kaydirouh support, machi مباشرة من هاد الشات. "
-                f"Ila bghiti suivi, modification, annulation, ولا شكاية، تواصل m3a support. {contact_line}"
+                "تدبير الطلبات كيديرو الدعم، ماشي مباشرة من هاد الشات. "
+                f"إلا بغيتي التتبع أو تعديل أو إلغاء أو شكاية، تواصل مع الدعم. {contact_line}"
             ),
         }[language]
         return self._compose_rule_based_reply(
@@ -736,7 +736,7 @@ class AIReplyService:
         reply_text = {
             "english": f"We are open {hours_line}.",
             "french": f"Nos horaires sont les suivants: {hours_line}.",
-            "darija": f"Les horaires dyalna houma: {hours_line}.",
+            "darija": f"أوقات الخدمة ديالنا هي: {hours_line}.",
         }[language]
         sources = [
             item
@@ -791,7 +791,7 @@ class AIReplyService:
         reply_text = {
             "english": f"Our store address is {address}. {channels_text}",
             "french": f"Notre adresse est {address}. {channels_text}",
-            "darija": f"L'adresse dyalna hiya {address}. {channels_text}",
+            "darija": f"العنوان ديالنا هو {address}. {channels_text}",
         }[language]
         sources = [
             item
@@ -831,7 +831,7 @@ class AIReplyService:
             ).strip()
         else:
             reply_text = (
-                f"T9dar ترجع produit f {business_profile.return_window_days} أيام. "
+                f"تقدر ترجع المنتج فـ {business_profile.return_window_days} أيام. "
                 f"{conditions}"
             ).strip()
         sources = [
@@ -871,12 +871,12 @@ class AIReplyService:
             tracking_line = {
                 "english": f" Tracking is available: {business_profile.delivery_tracking_method}",
                 "french": f" Le suivi est disponible: {business_profile.delivery_tracking_method}",
-                "darija": f" Tracking kayn: {business_profile.delivery_tracking_method}",
+                "darija": f" كاين التتبع: {business_profile.delivery_tracking_method}",
             }[language]
         reply_text = {
             "english": f"Yes, we deliver to {city} for {fee} MAD, with an estimated time of {eta}.{tracking_line}",
             "french": f"Oui, nous livrons à {city} pour {fee} MAD, avec un délai estimé de {eta}.{tracking_line}",
-            "darija": f"Iyah, kandirou delivery l {city} b {fee} MAD, w l délai ta9riban {eta}.{tracking_line}",
+            "darija": f"إييه، كنديرو التوصيل ل {city} ب {fee} MAD، والمدة تقريباً {eta}.{tracking_line}",
         }[language]
         sources = [
             item
@@ -1013,7 +1013,7 @@ class AIReplyService:
         if language == "french":
             return f"Contacts support: {details}"
         if language == "darija":
-            return f"Contacts dyal support: {details}"
+            return f"جهات التواصل مع الدعم: {details}"
         return f"Support contacts: {details}"
 
     async def _send_generated_reply(

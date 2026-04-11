@@ -391,6 +391,28 @@ def _seed_inbound(chat_repository: FakeChatRepository, business_id: int, phone: 
     )
 
 
+def test_darija_order_confirmation_replies_use_arabic_script() -> None:
+    service, _, _, _ = _build_service(business_default_language="darija")
+
+    confirmed = service._build_confirmed_reply(
+        "darija",
+        {"external_order_id": "WC-2001"},
+    )
+    fallback = service._build_fallback_reply("darija")
+    delivery = service._build_delivery_question_reply(
+        "darija",
+        {"delivery_city": "Casablanca", "delivery_address": "Hay Hassani"},
+        {},
+    )
+
+    assert "شكراً" in confirmed
+    assert "Shukran" not in confirmed
+    assert "ما فهمتش" in fallback
+    assert "Ma fhemtch" not in fallback
+    assert "تفاصيل التوصيل" in delivery
+    assert "Les infos li 3andna daba" not in delivery
+
+
 def test_ingest_store_order_creates_session_and_sends_confirmation() -> None:
     service, chat_repository, order_repository, confirmation_repository = _build_service()
 
@@ -1368,7 +1390,7 @@ def test_custom_text_does_not_replace_darija_business_default_language() -> None
     assert handled is True
     assert confirmation_repository.session["preferred_language"] == "darija"
     assert confirmation_repository.session["structured_snapshot"]["preferred_language"] == "darija"
-    assert "Hadchi howa l update dyal commande" in chat_repository.messages[1]["text"]
+    assert "ها التحديث ديال الطلب" in chat_repository.messages[1]["text"]
     assert service.llm_provider.detect_calls == []
 
 

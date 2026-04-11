@@ -1138,7 +1138,7 @@ class OrderConfirmationService:
         address_line = address or {
             "english": "as shared on your order",
             "french": "selon les informations de votre commande",
-            "darija": "b7al ma t9ayd f talab",
+            "darija": "بحال ما تكتب فالطلب",
         }[language]
         action_menu = self._build_action_menu(language)
         if language == "english":
@@ -1154,13 +1154,13 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                f"Salam{name_prefix} 👋\n\n"
-                f"Shukran 3la talab dyalk m3a *{business_name}*.\n\n"
-                f"🧾 Commande: #{order_ref}\n"
-                f"📦 Talab: {items_line}\n"
+                f"السلام عليكم{name_prefix} 👋\n\n"
+                f"شكراً على الطلب ديالك مع *{business_name}*.\n\n"
+                f"🧾 الطلب: #{order_ref}\n"
+                f"📦 المنتجات: {items_line}\n"
                 f"💰 Total: {amount}\n"
-                f"📍 Delivery: {address_line}\n\n"
-                "Jawb b wa7ed l option:\n"
+                f"📍 التوصيل: {address_line}\n\n"
+                "جاوب بواحد من هاد الخيارات:\n"
                 f"{action_menu}"
             )
         return (
@@ -1184,10 +1184,10 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "1️⃣ Confirmi commande\n"
-                "2️⃣ Bdel chi 7aja\n"
-                "3️⃣ Lghi commande\n"
-                "4️⃣ Hder m3a support"
+                "1️⃣ أكد الطلب\n"
+                "2️⃣ بدّل شي حاجة\n"
+                "3️⃣ ألغِ الطلب\n"
+                "4️⃣ هضر مع الدعم"
             )
         return (
             "1️⃣ Confirmer la commande\n"
@@ -1261,8 +1261,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                f"✅ Shukran.\n\n"
-                f"Commande *#{order_ref}* tconfirmat, w ghadi nwjduha l marhala jaya."
+                f"✅ شكراً.\n\n"
+                f"الطلب *#{order_ref}* تأكد، وغادي نوجدوه للمرحلة الجاية."
             )
         return (
             f"✅ Merci.\n\n"
@@ -1277,8 +1277,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "📝 Wad7.\n\n"
-                "Sjlna had commande comme annulée. Ila bghiti chi 7aja khra, support y9der y3awnek."
+                "📝 واضح.\n\n"
+                "سجلنا هاد الطلب كملغي. إلا بغيتي شي حاجة أخرى، الدعم يقدر يعاونك."
             )
         return (
             "📝 C'est noté.\n\n"
@@ -1293,8 +1293,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "✏️ Wakha.\n\n"
-                "Jawbna b dakchi li bghiti tbdel, b7al l'adresse, numéro, quantité, wela variant, w l'équipe dyalna ghadi tراجعو."
+                "✏️ واخا.\n\n"
+                "جاوبنا بداك الشي اللي بغيتي تبدل، بحال العنوان أو الرقم أو الكمية أو اللون، والفريق ديالنا غادي يراجعو."
             )
         return (
             "✏️ Très bien.\n\n"
@@ -1305,7 +1305,7 @@ class OrderConfirmationService:
         if language == "english":
             return "Thanks, we received your requested changes. Our team will review them and get back to you on WhatsApp."
         if language == "darija":
-            return "Shukran, tsjlat talab dyal التعديل. L'équipe dyalna ghadi tراجعو w ترجع ليك ف WhatsApp."
+            return "شكراً، تسجلات طلبات التعديل. الفريق ديالنا غادي يراجعها ويرجع ليك فـ WhatsApp."
         return "Merci, votre demande de modification a bien été reçue. Notre équipe va la vérifier et revenir vers vous sur WhatsApp."
 
     def _build_edit_interpretation_reply(
@@ -1334,16 +1334,16 @@ class OrderConfirmationService:
         if language == "darija":
             if changes:
                 return (
-                    "✏️ Wad7.\n\n"
-                    f"Tsjlo had talabat dyal التعديل: {changes}.\n"
+                    "✏️ واضح.\n\n"
+                    f"سجلنا هاد طلبات التعديل: {changes}.\n"
                     f"{revised_summary}\n\n"
                     f"{total_note}\n\n"
-                    "Jawb b 1 bach tconfirmi l commande b ta3dilat jdod, wela sift taghyir akhor."
+                    "جاوب ب 1 باش تأكد الطلب بالتعديلات الجديدة، ولا صيفط تعديل آخر."
                 )
             return (
-                "✏️ Wad7.\n\n"
+                "✏️ واضح.\n\n"
                 f"{revised_summary}\n\n"
-                "Jawb b 1 bach tconfirmi l commande b ta3dilat jdod, wela sift taghyir akhor."
+                "جاوب ب 1 باش تأكد الطلب بالتعديلات الجديدة، ولا صيفط تعديل آخر."
             )
         if changes:
             return (
@@ -1551,10 +1551,10 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "Hadchi howa l update dyal commande:\n"
-                f"📦 Talab: {items_summary}\n"
+                "ها التحديث ديال الطلب:\n"
+                f"📦 المنتجات: {items_summary}\n"
                 f"💰 Total: {amount_line}\n"
-                f"📍 Delivery: {address}"
+                f"📍 التوصيل: {address}"
             )
         return (
             "Résumé mis à jour de la commande :\n"
@@ -1592,11 +1592,11 @@ class OrderConfirmationService:
             if language == "english":
                 return "We noted the updated quantity. The final total will be confirmed with the order."
             if language == "darija":
-                return "Sjlna l quantité jdida. Total النهائي ghadi يتأكد m3a l commande."
+                return "سجلنا الكمية الجديدة. الثمن النهائي غادي يتأكد مع الطلب."
             return "La quantité mise à jour a été enregistrée. Le total final sera confirmé avec la commande."
         return {
             "english": "If everything looks right, confirm the updated order below.",
-            "darija": "Ila kolchi mzyan, confirmi l commande b ta3dilat jdod.",
+            "darija": "إلا كان كلشي مزيان، أكد الطلب بالتعديلات الجديدة.",
             "french": "Si tout est correct, confirmez la commande mise à jour ci-dessous.",
         }[language]
 
@@ -1614,10 +1614,10 @@ class OrderConfirmationService:
             ).strip()
         if language == "darija":
             return (
-                "📍 Delivery details\n\n"
-                f"Les infos li 3andna daba: {city}, {address}\n\n"
-                "Ila صحاح jawb b 1 bach tconfirmi.\n"
-                "Ila bghiti tbdelhom, sift l details jdod."
+                "📍 تفاصيل التوصيل\n\n"
+                f"المعلومات اللي عندنا دابا: {city}, {address}\n\n"
+                "إلا صحيحة جاوب ب 1 باش تأكد.\n"
+                "إلا بغيتي تبدلها، صيفط التفاصيل الجديدة."
             ).strip()
         return (
             "📍 Détails de livraison\n\n"
@@ -1636,9 +1636,9 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "💳 Paiement\n\n"
-                f"Tariqat l paiement f had commande hiya {payment_method}.\n"
-                "Ila bghiti tbdelha, sift talab dyalk w l'équipe ghadi tراجعو."
+                "💳 معلومات الأداء\n\n"
+                f"طريقة الأداء فهاد الطلب هي {payment_method}.\n"
+                "إلا بغيتي تبدلها، صيفط الطلب ديالك والفريق غادي يراجعو."
             )
         return (
             "💳 Paiement\n\n"
@@ -1654,8 +1654,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "↩️ Return policy\n\n"
-                "Bnisba l politique dyal l return f had commande, support dyalna ghadi yشرحها ليك f WhatsApp."
+                "↩️ سياسة الإرجاع\n\n"
+                "بالنسبة لسياسة الإرجاع فهاد الطلب، الدعم ديالنا غادي يشرحها ليك فـ WhatsApp."
             )
         return (
             "↩️ Politique de retour\n\n"
@@ -1670,8 +1670,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "🤝 Wad7.\n\n"
-                "Ghadi n7awlo had commande l agent bach ykمل m3ak f WhatsApp."
+                "🤝 واضح.\n\n"
+                "غادي نحوّل هاد الطلب لوكيل بشري باش يكمل معاك فـ WhatsApp."
             )
         return (
             "🤝 Bien reçu.\n\n"
@@ -1686,8 +1686,8 @@ class OrderConfirmationService:
             )
         if language == "darija":
             return (
-                "🤝 Ma fhemtch mzyan jawab dyalk.\n\n"
-                "Support ghadi ykمل m3ak f WhatsApp."
+                "🤝 ما فهمتش مزيان الجواب ديالك.\n\n"
+                "الدعم غادي يكمل معاك فـ WhatsApp."
             )
         return (
             "🤝 Je n'ai pas bien compris votre réponse.\n\n"

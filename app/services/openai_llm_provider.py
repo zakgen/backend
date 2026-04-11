@@ -45,6 +45,7 @@ Return valid JSON with exactly these keys:
 Rules:
 - Use the order snapshot as the source of truth.
 - Detect mixed intents when present.
+- If language=darija, write any customer-facing Darija content in Arabic script, not Latin transliteration.
 - If the customer confirms but also asks to change an address/variant/quantity, use primary_action=edit_request and include confirm in secondary_actions.
 - If the customer asks about delivery ETA/fee/city/address confirmation, use delivery_question.
 - If the customer asks about payment, use payment_question.
